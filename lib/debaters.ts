@@ -5,7 +5,10 @@ import type { DebateConfig, Phase, Side, Turn } from "./types";
 export const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || "claude-opus-4-8";
 // NOTE: confirm the exact GPT-5.5 Thinking model id for your account and set
 // OPENAI_MODEL in .env.local. This default is a best guess.
-export const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-5.5-thinking";
+export const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-5.5";
+// Reasoning effort puts GPT-5.5 in "thinking" mode. Set OPENAI_REASONING_EFFORT
+// to low | medium | high (default medium).
+export const OPENAI_EFFORT = process.env.OPENAI_REASONING_EFFORT || "medium";
 
 export const hasClaude = () => !!process.env.ANTHROPIC_API_KEY;
 export const hasGpt = () => !!process.env.OPENAI_API_KEY;
@@ -102,6 +105,7 @@ export async function gptTurn(
     instructions: system,
     input: user,
     max_output_tokens: 2000,
+    reasoning: { effort: OPENAI_EFFORT as "low" | "medium" | "high" },
   });
 
   const text = (res.output_text || "").trim();

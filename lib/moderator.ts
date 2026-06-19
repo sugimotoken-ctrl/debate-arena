@@ -7,8 +7,10 @@ import type {
   Verdict,
 } from "./types";
 
-export const GEMINI_MODEL = process.env.GOOGLE_MODEL || "gemini-2.5-pro";
+export const GEMINI_MODEL = process.env.GOOGLE_MODEL || "gemini-2.5-flash";
 export const hasGemini = () => !!process.env.GOOGLE_API_KEY;
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 function transcriptText(turns: Turn[]): string {
   return turns
@@ -34,8 +36,22 @@ async function geminiJson(prompt: string): Promise<any> {
     model: GEMINI_MODEL,
     generationConfig: { responseMimeType: "application/json" },
   });
-  const res = await model.generateContent(prompt);
-  return extractJson(res.response.text());
+
+  // Retry transient overload / rate-limit errors before giving up.
+  let lastErr: unknown;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const res = await model.generateContent(prompt);
+      return extractJson(res.response.text());
+    } catch (e: any) {
+      lastErr = e;
+      const msg = String(e?.message || "");
+      const transient = /503|429|overload|high demand|unavailable/i.test(msg);
+      if (!transient || attempt === 2) break;
+      await sleep(800 * (attempt + 1));
+    }
+  }
+  throw lastErr;
 }
 
 export async function moderateRound(
