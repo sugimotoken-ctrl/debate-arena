@@ -1,8 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import DebateBoard from "./DebateBoard";
+import DebateHistory from "./DebateHistory";
+import {
+  addToHistory,
+  clearHistory,
+  getHistory,
+  removeFromHistory,
+} from "@/lib/history";
 import type {
+  Debate,
   DebateConfig,
   FinalSummary,
   Moderation,
@@ -44,6 +52,11 @@ export default function DebateApp() {
   const [error, setError] = useState<string | null>(null);
   const [shareId, setShareId] = useState<string | null>(null);
   const [started, setStarted] = useState(false);
+  const [history, setHistory] = useState<Debate[]>([]);
+
+  useEffect(() => {
+    setHistory(getHistory());
+  }, []);
 
   const config: DebateConfig = {
     topic: topic.trim(),
@@ -146,6 +159,25 @@ export default function DebateApp() {
       });
       const saveData = await saveRes.json().catch(() => ({}));
       if (saveData.id) setShareId(saveData.id);
+
+      // Record the full debate in per-browser history.
+      const localId: string =
+        saveData.id ||
+        (typeof crypto !== "undefined" && crypto.randomUUID
+          ? crypto.randomUUID()
+          : String(Date.now()));
+      const record: Debate = {
+        id: localId,
+        config,
+        turns: acc,
+        moderations: mods,
+        summary: finalSummary,
+        verdict: finalVerdict,
+        createdAt: Date.now(),
+        mock: anyMock,
+        shared: !!saveData.id,
+      };
+      setHistory(addToHistory(record));
     } catch (e: any) {
       setError(e?.message || "Something went wrong.");
     } finally {
@@ -160,6 +192,7 @@ export default function DebateApp() {
   }
 
   return (
+    <>
     <div className="max-w-4xl mx-auto px-4 py-8 space-y-8">
       <header className="text-center space-y-2">
         <h1 className="text-3xl font-bold text-white">⚖️ Debate Arena</h1>
@@ -290,5 +323,12 @@ export default function DebateApp() {
         />
       )}
     </div>
+
+    <DebateHistory
+      items={history}
+      onDelete={(id) => setHistory(removeFromHistory(id))}
+      onClear={() => setHistory(clearHistory())}
+    />
+    </>
   );
 }

@@ -49,6 +49,7 @@ export interface Debate {
   verdict: Verdict;
   createdAt: number;
   mock: boolean;
+  shared?: boolean; // true if this debate has a server-side shareable link
 }
 
 export const DEFAULT_CONFIG: Omit<DebateConfig, "topic" | "stanceA" | "stanceB"> =
