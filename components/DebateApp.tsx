@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import DebateBoard from "./DebateBoard";
 import DebateHistory from "./DebateHistory";
 import {
@@ -18,35 +18,33 @@ import type {
   Verdict,
 } from "@/lib/types";
 
-const EXAMPLES = [
-  {
-    topic: "Remote work is better for society",
-    stanceA: "Remote work is better for society.",
-    stanceB: "Office work is better for society.",
-  },
-  {
-    topic: "AI development should be paused until safety is solved",
-    stanceA: "AI development should be paused until safety is solved.",
-    stanceB: "AI development should continue without a pause.",
-  },
-  {
-    topic: "A four-day work week should be the default",
-    stanceA: "A four-day work week improves outcomes for everyone.",
-    stanceB: "A five-day work week remains the better default.",
-  },
-];
+const MAX_ROUNDS = 4;
+const THRESHOLD = 80;
+
+function personaFrom(name: string, role: string): string | undefined {
+  const n = name.trim();
+  const r = role.trim();
+  if (!n && !r) return undefined;
+  return `You are ${n || "an expert debater"}${
+    r ? `, ${r}` : ""
+  }. Debate in character, drawing on that background and expertise.`;
+}
 
 export default function DebateApp({
   onSwitchToCouncil,
 }: {
   onSwitchToCouncil?: () => void;
 }) {
-  const [topic, setTopic] = useState("");
-  const [stanceA, setStanceA] = useState("");
-  const [stanceB, setStanceB] = useState("");
-  const [maxRounds, setMaxRounds] = useState(4);
-  const [threshold, setThreshold] = useState(80);
+  // Motion + editable debaters
+  const [motion, setMotion] = useState("");
+  const [nameA, setNameA] = useState("");
+  const [roleA, setRoleA] = useState("");
+  const [photoA, setPhotoA] = useState<string | null>(null);
+  const [nameB, setNameB] = useState("");
+  const [roleB, setRoleB] = useState("");
+  const [photoB, setPhotoB] = useState<string | null>(null);
 
+  // Debate run state
   const [turns, setTurns] = useState<Turn[]>([]);
   const [moderations, setModerations] = useState<Moderation[]>([]);
   const [verdict, setVerdict] = useState<Verdict>("ongoing");
@@ -63,22 +61,18 @@ export default function DebateApp({
   }, []);
 
   const config: DebateConfig = {
-    topic: topic.trim(),
-    stanceA: stanceA.trim(),
-    stanceB: stanceB.trim(),
-    maxRounds,
-    agreementThreshold: threshold,
+    topic: motion.trim(),
+    stanceA: `Argue FOR the motion: "${motion.trim()}".`,
+    stanceB: `Argue AGAINST the motion: "${motion.trim()}".`,
+    personaA: personaFrom(nameA, roleA),
+    personaB: personaFrom(nameB, roleB),
+    maxRounds: MAX_ROUNDS,
+    agreementThreshold: THRESHOLD,
   };
 
-  function loadExample(i: number) {
-    setTopic(EXAMPLES[i].topic);
-    setStanceA(EXAMPLES[i].stanceA);
-    setStanceB(EXAMPLES[i].stanceB);
-  }
-
   async function run() {
-    if (!config.topic || !config.stanceA || !config.stanceB) {
-      setError("Fill in the motion and both positions.");
+    if (!motion.trim()) {
+      setError("Enter the motion to debate.");
       return;
     }
     setError(null);
@@ -96,7 +90,7 @@ export default function DebateApp({
     let anyMock = false;
 
     try {
-      for (let round = 0; round < maxRounds; round++) {
+      for (let round = 0; round < MAX_ROUNDS; round++) {
         const res = await fetch("/api/debate/round", {
           method: "POST",
           headers: { "content-type": "application/json" },
@@ -128,9 +122,7 @@ export default function DebateApp({
           finalVerdict = "impasse";
           break;
         }
-        if (round === maxRounds - 1) {
-          finalVerdict = "timeout";
-        }
+        if (round === MAX_ROUNDS - 1) finalVerdict = "timeout";
       }
 
       setVerdict(finalVerdict);
@@ -186,18 +178,12 @@ export default function DebateApp({
     }
   }
 
-  function swapAndRerun() {
-    setStanceA(stanceB);
-    setStanceB(stanceA);
-    setTimeout(run, 50);
-  }
-
   return (
     <div className="mx-auto px-10 pb-20" style={{ maxWidth: 1000 }}>
       {/* Hero */}
       <div className="text-center">
         <span
-          className="inline-block rounded-full"
+          className="inline-block"
           style={{
             background: "#fff",
             border: "1px solid rgba(255,107,74,.35)",
@@ -205,19 +191,24 @@ export default function DebateApp({
             fontWeight: 700,
             fontSize: 13,
             letterSpacing: 2.5,
-            padding: "6px 14px",
+            padding: "8px 18px",
+            borderRadius: 999,
+            boxShadow: "0 4px 14px rgba(255,107,74,.12)",
           }}
         >
-          TWO MODELS · HEAD TO HEAD
+          TWO PROFESSIONALS · HEAD TO HEAD
         </span>
         <h1
           className="font-display uppercase mx-auto mt-4"
           style={{
             fontSize: "clamp(48px,8vw,104px)",
+            letterSpacing: 1,
             lineHeight: 0.92,
-            background: "linear-gradient(92deg,#FF6B4A,#FF9F1C 45%,#6C5CFF)",
+            background:
+              "linear-gradient(92deg,#FF6B4A,#FF9F1C 45%,#6C5CFF)",
             WebkitBackgroundClip: "text",
             backgroundClip: "text",
+            WebkitTextFillColor: "transparent",
             color: "transparent",
           }}
         >
@@ -225,80 +216,69 @@ export default function DebateApp({
         </h1>
         <p
           className="mx-auto mt-3"
-          style={{ maxWidth: 560, fontSize: 18, color: "#5C5C6E", lineHeight: 1.55 }}
+          style={{
+            maxWidth: 560,
+            fontSize: 18,
+            lineHeight: 1.55,
+            color: "#5C5C6E",
+          }}
         >
-          Two models take opposite sides of your motion and argue it out, round
-          by round, while a neutral moderator scores the exchange.
+          Two professionals take opposite sides of your topic and argue it out,
+          round by round, while a neutral moderator scores the exchange.
         </p>
-      </div>
-
-      {/* Example chips */}
-      <div className="flex flex-wrap gap-2 justify-center mt-5">
-        {EXAMPLES.map((e, i) => (
-          <button
-            key={i}
-            onClick={() => loadExample(i)}
-            className="rounded-full"
-            style={{
-              padding: "5px 12px",
-              fontSize: 12.5,
-              background: "#fff",
-              border: "1px solid rgba(20,20,28,.1)",
-              color: "#6B6B7B",
-            }}
-          >
-            {e.topic}
-          </button>
-        ))}
       </div>
 
       {/* Debater cards */}
       <div
-        className="grid items-stretch gap-4 mt-6"
-        style={{ gridTemplateColumns: "1fr auto 1fr" }}
+        className="mt-8 items-stretch"
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr auto 1fr",
+          gap: 18,
+        }}
       >
         <DebaterCard
-          color="#FF6B4A"
-          tint="#FFF1EC"
-          stancePill="👍 SIDE A · FOR"
-          model="Claude Opus 4.8"
-          org="Anthropic"
-          emoji="⚖️"
-          stance={stanceA}
-          onStance={setStanceA}
-          placeholder="The position Claude argues for"
+          side="A"
+          name={nameA}
+          role={roleA}
+          photo={photoA}
+          onName={setNameA}
+          onRole={setRoleA}
+          onPhoto={setPhotoA}
         />
+
+        {/* VS medallion */}
         <div className="self-center grid place-items-center relative" style={{ width: 82, height: 82 }}>
           <div
             className="absolute inset-0 rounded-full"
             style={{
-              background: "conic-gradient(from 0deg,#FF6B4A,#FF9F1C,#6C5CFF,#FF6B4A)",
+              background:
+                "conic-gradient(from 0deg,#FF6B4A,#FF9F1C,#6C5CFF,#FF6B4A)",
               animation: "spin360 8s linear infinite",
             }}
           />
           <div
             className="absolute grid place-items-center rounded-full font-display"
-            style={{ inset: 4, background: "#fff", fontSize: 30 }}
+            style={{ inset: 4, background: "#fff", fontSize: 32, color: "#14141C" }}
           >
             VS
           </div>
         </div>
+
         <DebaterCard
-          color="#6C5CFF"
-          tint="#F1EFFF"
-          stancePill="👎 SIDE B · AGAINST"
-          model="GPT-5.5 Thinking"
-          org="OpenAI"
-          emoji="🤖"
-          stance={stanceB}
-          onStance={setStanceB}
-          placeholder="The opposing position GPT argues for"
+          side="B"
+          name={nameB}
+          role={roleB}
+          photo={photoB}
+          onName={setNameB}
+          onRole={setRoleB}
+          onPhoto={setPhotoB}
         />
       </div>
 
       {/* Motion card */}
       <div
-        className="bg-white mt-5"
+        className="bg-white mt-[22px]"
         style={{
           border: "1px solid rgba(20,20,28,.08)",
           borderRadius: 24,
@@ -306,103 +286,79 @@ export default function DebateApp({
           boxShadow: "0 24px 60px rgba(20,20,28,.10)",
         }}
       >
-        <div style={{ fontWeight: 700, fontSize: 13, color: "#6B6B7B", letterSpacing: 0.5 }}>
+        <div
+          style={{
+            fontWeight: 700,
+            fontSize: 13,
+            color: "#6B6B7B",
+            letterSpacing: 0.5,
+            marginBottom: 10,
+          }}
+        >
           THE MOTION
         </div>
-        <div className="flex gap-3 mt-2">
+        <div className="flex gap-3">
           <input
-            value={topic}
-            onChange={(e) => setTopic(e.target.value)}
+            value={motion}
+            dir="auto"
+            onChange={(e) => setMotion(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !running) run();
+            }}
             placeholder="e.g. This house believes remote work is better for society"
-            className="flex-1 outline-none"
+            className="flex-1 focus:outline-none"
             style={{
               background: "#F6F7FB",
               border: "1.5px solid rgba(20,20,28,.1)",
               borderRadius: 14,
-              padding: "12px 14px",
               fontSize: 16,
+              fontWeight: 500,
+              padding: "16px 18px",
+              color: "#14141C",
             }}
           />
           <button
             onClick={run}
             disabled={running}
-            className="debate-fill font-display disabled:opacity-60"
+            className="font-display text-white disabled:opacity-60"
             style={{
               fontSize: 17,
               letterSpacing: 1,
-              color: "#fff",
+              background: "linear-gradient(92deg,#FF6B4A,#FF9F1C)",
               borderRadius: 14,
               padding: "0 26px",
             }}
           >
-            {running ? "…" : "START →"}
+            {running ? "DEBATING…" : "START →"}
           </button>
         </div>
-
-        {/* Controls */}
-        <div className="flex flex-wrap items-center gap-6 mt-4">
-          <label style={{ fontSize: 13, color: "#6B6B7B" }}>
-            Rounds: <b style={{ color: "#14141C" }}>{maxRounds}</b>
-            <input
-              type="range"
-              min={2}
-              max={8}
-              value={maxRounds}
-              onChange={(e) => setMaxRounds(Number(e.target.value))}
-              className="ml-2 align-middle"
-            />
-          </label>
-          <label style={{ fontSize: 13, color: "#6B6B7B" }}>
-            Agreement threshold: <b style={{ color: "#14141C" }}>{threshold}%</b>
-            <input
-              type="range"
-              min={50}
-              max={95}
-              step={5}
-              value={threshold}
-              onChange={(e) => setThreshold(Number(e.target.value))}
-              className="ml-2 align-middle"
-            />
-          </label>
-          {started && !running && (
-            <button
-              onClick={swapAndRerun}
-              className="rounded-lg"
-              style={{
-                padding: "7px 14px",
-                fontSize: 13,
-                background: "#F6F7FB",
-                border: "1px solid rgba(20,20,28,.1)",
-                color: "#3A3A48",
-              }}
-            >
-              ⇄ Swap &amp; rematch
-            </button>
-          )}
+        {error && (
+          <p className="mt-3" style={{ color: "#FF4D9D", fontSize: 14 }}>
+            {error}
+          </p>
+        )}
+        <div className="mt-[18px]" style={{ fontSize: 14, color: "#9A9AAC" }}>
+          Need a full board instead of a duel? Switch to the{" "}
+          <button
+            onClick={onSwitchToCouncil}
+            className="font-semibold"
+            style={{ color: "#6C5CFF" }}
+          >
+            🏛️ Council
+          </button>
+          .
         </div>
-
-        {error && <p style={{ color: "#FF6B4A", fontSize: 14, marginTop: 10 }}>{error}</p>}
         {shareId && (
-          <p style={{ fontSize: 14, marginTop: 10, color: "#0E9E6E" }}>
+          <p className="mt-2" style={{ fontSize: 14, color: "#0E9E6E" }}>
             Saved ·{" "}
             <a className="underline" href={`/debate/${shareId}`}>
               shareable link
             </a>
           </p>
         )}
-        <p style={{ fontSize: 13.5, color: "#9A9AAC", marginTop: 12 }}>
-          Need a full board instead of a duel?{" "}
-          <button
-            onClick={onSwitchToCouncil}
-            className="underline"
-            style={{ color: "#6C5CFF", fontWeight: 600 }}
-          >
-            Switch to the 🏛️ Council
-          </button>
-          .
-        </p>
       </div>
 
+      {/* Results */}
       {started && (
         <div className="mt-8">
           <DebateBoard
@@ -417,83 +373,181 @@ export default function DebateApp({
         </div>
       )}
 
-      <div className="mt-8">
-        <DebateHistory
-          items={history}
-          onDelete={(id) => setHistory(removeFromHistory(id))}
-          onClear={() => setHistory(clearHistory())}
-        />
-      </div>
+      {history.length > 0 && (
+        <div className="mt-10">
+          <DebateHistory
+            items={history}
+            onDelete={(id) => setHistory(removeFromHistory(id))}
+            onClear={() => setHistory(clearHistory())}
+          />
+        </div>
+      )}
     </div>
   );
 }
 
+// ---------- Editable debater card ----------
+
 function DebaterCard({
-  color,
-  tint,
-  stancePill,
-  model,
-  org,
-  emoji,
-  stance,
-  onStance,
-  placeholder,
+  side,
+  name,
+  role,
+  photo,
+  onName,
+  onRole,
+  onPhoto,
 }: {
-  color: string;
-  tint: string;
-  stancePill: string;
-  model: string;
-  org: string;
-  emoji: string;
-  stance: string;
-  onStance: (v: string) => void;
-  placeholder: string;
+  side: "A" | "B";
+  name: string;
+  role: string;
+  photo: string | null;
+  onName: (v: string) => void;
+  onRole: (v: string) => void;
+  onPhoto: (v: string | null) => void;
 }) {
+  const isA = side === "A";
+  const accent = isA ? "#FF6B4A" : "#6C5CFF";
+  const tint = isA ? "#FFF1EC" : "#F1EFFF";
+  const border = isA ? "rgba(255,107,74,.3)" : "rgba(108,92,255,.3)";
+  const shadow = isA ? "rgba(255,107,74,.12)" : "rgba(108,92,255,.12)";
+  const stance = isA ? "👍 FOR THE MOTION" : "👎 AGAINST THE MOTION";
+  const namePlaceholder = isA
+    ? "Name — e.g. Dr. Ada Chen"
+    : "Name — e.g. Marcus Reed";
+
   return (
     <div
-      className="bg-white flex flex-col gap-3"
+      className="bg-white"
       style={{
-        border: `1px solid ${color}4d`,
+        border: `1px solid ${border}`,
         borderRadius: 24,
         padding: 20,
-        boxShadow: `0 18px 40px ${color}1f`,
+        boxShadow: `0 18px 40px ${shadow}`,
       }}
     >
-      <div
-        className="grid place-items-center"
-        style={{ height: 130, borderRadius: 16, background: tint }}
-      >
-        <div style={{ fontSize: 46 }}>{emoji}</div>
-      </div>
+      <ImageSlot
+        photo={photo}
+        onPhoto={onPhoto}
+        tint={tint}
+        accent={accent}
+        placeholder={`Drop a photo of Debater ${side}`}
+      />
+
       <span
-        className="self-start rounded-full"
+        className="inline-flex items-center mt-4"
         style={{
           background: tint,
-          color,
+          color: accent,
           fontWeight: 800,
           fontSize: 12,
           letterSpacing: 1,
-          padding: "5px 12px",
+          padding: "6px 12px",
+          borderRadius: 999,
         }}
       >
-        {stancePill}
+        {stance}
       </span>
-      <div style={{ fontWeight: 700, fontSize: 20, color: "#14141C" }}>{model}</div>
-      <div style={{ fontSize: 14, color: "#8A8A9A", marginTop: -8 }}>{org}</div>
-      <textarea
-        value={stance}
-        onChange={(e) => onStance(e.target.value)}
-        placeholder={placeholder}
-        rows={3}
-        className="outline-none resize-y"
-        style={{
-          background: "#F6F7FB",
-          border: "1.5px solid rgba(20,20,28,.1)",
-          borderRadius: 14,
-          padding: "10px 12px",
-          fontSize: 14,
-          color: "#14141C",
-        }}
+
+      <input
+        value={name}
+        onChange={(e) => onName(e.target.value)}
+        placeholder={namePlaceholder}
+        className="block w-full bg-transparent focus:outline-none mt-3"
+        style={{ fontWeight: 700, fontSize: 20, color: "#14141C" }}
+      />
+      <input
+        value={role}
+        onChange={(e) => onRole(e.target.value)}
+        placeholder="Title / expertise"
+        className="block w-full bg-transparent focus:outline-none mt-1"
+        style={{ fontWeight: 500, fontSize: 14, color: "#8A8A9A" }}
+      />
+    </div>
+  );
+}
+
+function ImageSlot({
+  photo,
+  onPhoto,
+  tint,
+  accent,
+  placeholder,
+}: {
+  photo: string | null;
+  onPhoto: (v: string | null) => void;
+  tint: string;
+  accent: string;
+  placeholder: string;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [drag, setDrag] = useState(false);
+
+  function handleFile(f?: File | null) {
+    if (!f || !f.type.startsWith("image/")) return;
+    const reader = new FileReader();
+    reader.onload = () => onPhoto(String(reader.result));
+    reader.readAsDataURL(f);
+  }
+
+  return (
+    <div
+      onClick={() => inputRef.current?.click()}
+      onDragOver={(e) => {
+        e.preventDefault();
+        setDrag(true);
+      }}
+      onDragLeave={() => setDrag(false)}
+      onDrop={(e) => {
+        e.preventDefault();
+        setDrag(false);
+        handleFile(e.dataTransfer.files?.[0]);
+      }}
+      className="relative w-full cursor-pointer overflow-hidden grid place-items-center text-center group"
+      style={{
+        height: 220,
+        borderRadius: 16,
+        background: tint,
+        outline: drag ? `2px dashed ${accent}` : "none",
+      }}
+    >
+      {photo ? (
+        <>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={photo}
+            alt=""
+            className="absolute inset-0 w-full h-full"
+            style={{ objectFit: "cover" }}
+          />
+          <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition grid place-items-center bg-black/35">
+            <span className="text-white text-sm font-semibold">Change photo</span>
+          </div>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onPhoto(null);
+            }}
+            className="absolute top-2 right-2 w-7 h-7 grid place-items-center rounded-full bg-black/45 text-white text-xs opacity-0 group-hover:opacity-100 transition"
+            title="Remove photo"
+          >
+            ✕
+          </button>
+        </>
+      ) : (
+        <span className="px-4" style={{ color: "#9A9AAC", fontSize: 14 }}>
+          {placeholder}
+          <span className="block text-xs mt-1" style={{ color: "#B8B8C6" }}>
+            click or drop an image
+          </span>
+        </span>
+      )}
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => handleFile(e.target.files?.[0])}
       />
     </div>
   );
