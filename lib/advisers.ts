@@ -1,5 +1,5 @@
-import Anthropic from "@anthropic-ai/sdk";
-import { ANTHROPIC_MODEL, hasClaude } from "./debaters";
+import OpenAI from "openai";
+import { hasGpt } from "./debaters";
 import { ADVISERS, adviserById } from "./advisers-data";
 import type { Adviser, Advice, CouncilSynthesis } from "./advisers-data";
 
@@ -7,7 +7,18 @@ import type { Adviser, Advice, CouncilSynthesis } from "./advisers-data";
 export { ADVISERS, adviserById };
 export type { Adviser, Advice, CouncilSynthesis };
 
-// ---------- Advice generation ----------
+// The Council runs on ChatGPT only, at the highest tier available.
+export const COUNCIL_MODEL = process.env.COUNCIL_MODEL || "gpt-5.5-pro";
+export const COUNCIL_EFFORT = process.env.COUNCIL_EFFORT || "high";
+
+export type Lang = "auto" | "en" | "fa";
+
+function langInstruction(language: Lang): string {
+  if (language === "fa")
+    return "Respond entirely in Farsi (فارسی). Every field of your answer must be in natural Farsi.";
+  if (language === "en") return "Respond in English.";
+  return "Respond in the same language the user used in the topic and context.";
+}
 
 function extractJson(raw: string): any {
   const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
@@ -18,67 +29,86 @@ function extractJson(raw: string): any {
   return JSON.parse(body.slice(start, end + 1));
 }
 
-function buildAdvicePrompt(adviser: Adviser, topic: string, context: string) {
-  const system = [
-    adviser.persona,
-    `You are one of several advisers in a boardroom advising on a decision.`,
-    `Speak ONLY from your perspective as ${adviser.name} (${adviser.role}).`,
-    `Be concise and specific — at most ~140 words. No preamble.`,
-    `End with one line starting exactly with "Bottom line:" giving your crisp recommendation.`,
-  ].join("\n");
-
-  const user = [
-    `TOPIC / DECISION: ${topic}`,
-    context ? `CONTEXT: ${context}` : "",
-    ``,
-    `Give your advice.`,
-  ]
-    .filter(Boolean)
-    .join("\n");
-
-  return { system, user };
+// gpt-5.5-pro runs in thinking mode. Try with reasoning effort; if a model
+// rejects the param, retry without it.
+async function respond(
+  client: OpenAI,
+  opts: { instructions: string; input: string; max: number },
+): Promise<string> {
+  const base = {
+    model: COUNCIL_MODEL,
+    instructions: opts.instructions,
+    input: opts.input,
+    max_output_tokens: opts.max,
+  };
+  try {
+    const res = await client.responses.create({
+      ...base,
+      reasoning: { effort: COUNCIL_EFFORT as any },
+    });
+    return res.output_text || "";
+  } catch (e: any) {
+    const m = String(e?.message || "");
+    if (/reasoning|effort|unsupported|unknown|not supported/i.test(m)) {
+      const res = await client.responses.create(base);
+      return res.output_text || "";
+    }
+    throw e;
+  }
 }
+
+// ---------- Advice generation (one adviser) ----------
 
 export async function adviseOne(
   adviser: Adviser,
   topic: string,
   context: string,
+  language: Lang = "auto",
 ): Promise<Advice> {
-  if (!hasClaude()) return mockAdvice(adviser, topic);
+  if (!hasGpt()) return mockAdvice(adviser, topic);
 
-  const { system, user } = buildAdvicePrompt(adviser, topic, context);
-  const client = new Anthropic();
-  const res = await client.messages.create({
-    model: ANTHROPIC_MODEL,
-    max_tokens: 900,
-    thinking: { type: "adaptive" },
-    output_config: { effort: "low" },
-    system,
-    messages: [{ role: "user", content: user }],
-  });
+  const instructions = [
+    adviser.persona,
+    "You are one of several advisers in a boardroom advising on a decision.",
+    `Speak ONLY from your perspective as ${adviser.name} (${adviser.role}).`,
+    "Be concise and specific — at most ~140 words for the body. No preamble.",
+    langInstruction(language),
+    'Respond ONLY with JSON: {"body": string, "bottomLine": string}. "bottomLine" is your single-sentence crisp recommendation.',
+  ].join("\n");
 
-  const text = res.content
-    .filter((b): b is Anthropic.TextBlock => b.type === "text")
-    .map((b) => b.text)
-    .join("\n")
-    .trim();
+  const input = [
+    `TOPIC / DECISION: ${topic}`,
+    context ? `CONTEXT: ${context}` : "",
+    "",
+    "Give your advice.",
+  ]
+    .filter(Boolean)
+    .join("\n");
 
-  return splitAdvice(adviser, text, ANTHROPIC_MODEL);
-}
-
-function splitAdvice(adviser: Adviser, text: string, model: string): Advice {
-  const m = text.match(/bottom line:\s*(.*)$/i);
-  const bottomLine = m ? m[1].trim() : "";
-  const body = m ? text.slice(0, m.index).trim() : text;
-  return {
-    adviserId: adviser.id,
-    name: adviser.name,
-    role: adviser.role,
-    emoji: adviser.emoji,
-    body,
-    bottomLine,
-    model,
-  };
+  try {
+    const client = new OpenAI();
+    const text = await respond(client, { instructions, input, max: 6000 });
+    const j = extractJson(text);
+    return {
+      adviserId: adviser.id,
+      name: adviser.name,
+      role: adviser.role,
+      emoji: adviser.emoji,
+      body: String(j.body ?? "").trim(),
+      bottomLine: String(j.bottomLine ?? "").trim(),
+      model: COUNCIL_MODEL,
+    };
+  } catch (e: any) {
+    return {
+      adviserId: adviser.id,
+      name: adviser.name,
+      role: adviser.role,
+      emoji: adviser.emoji,
+      body: `⚠ ${adviser.name} couldn't respond this time (${String(e?.message || "error").slice(0, 120)}).`,
+      bottomLine: "",
+      model: COUNCIL_MODEL,
+    };
+  }
 }
 
 // ---------- Chair synthesis ----------
@@ -87,50 +117,41 @@ export async function synthesize(
   topic: string,
   context: string,
   advices: Advice[],
+  language: Lang = "auto",
 ): Promise<CouncilSynthesis> {
-  if (!hasClaude()) return mockSynthesis(advices);
+  if (!hasGpt()) return mockSynthesis(advices);
 
   const panel = advices
     .map((a) => `${a.name} (${a.role}): ${a.body}\nBottom line: ${a.bottomLine}`)
     .join("\n\n");
 
-  const system = [
-    `You are the neutral Chair of an advisory board. You do not add new opinions;`,
-    `you synthesize the advisers' input into a decision-ready brief.`,
-    `Respond ONLY with JSON of this shape:`,
-    `{`,
-    `  "consensus": string[],   // points most advisers agree on`,
-    `  "tensions": string[],    // genuine disagreements between advisers`,
-    `  "recommendation": string,// 1-3 sentence balanced recommendation`,
-    `  "risks": string[],       // the most important risks raised`,
-    `  "nextSteps": string[]    // concrete next actions`,
-    `}`,
+  const instructions = [
+    "You are the neutral Chair of an advisory board. You do not add new opinions;",
+    "you synthesize the advisers' input into a decision-ready brief.",
+    langInstruction(language),
+    "Respond ONLY with JSON of this shape:",
+    "{",
+    '  "consensus": string[],',
+    '  "tensions": string[],',
+    '  "recommendation": string,',
+    '  "risks": string[],',
+    '  "nextSteps": string[]',
+    "}",
   ].join("\n");
 
-  const user = [
+  const input = [
     `TOPIC / DECISION: ${topic}`,
     context ? `CONTEXT: ${context}` : "",
-    ``,
-    `ADVISER INPUT:`,
+    "",
+    "ADVISER INPUT:",
     panel,
   ]
     .filter(Boolean)
     .join("\n");
 
   try {
-    const client = new Anthropic();
-    const res = await client.messages.create({
-      model: ANTHROPIC_MODEL,
-      max_tokens: 1500,
-      thinking: { type: "adaptive" },
-      output_config: { effort: "medium" },
-      system,
-      messages: [{ role: "user", content: user }],
-    });
-    const text = res.content
-      .filter((b): b is Anthropic.TextBlock => b.type === "text")
-      .map((b) => b.text)
-      .join("\n");
+    const client = new OpenAI();
+    const text = await respond(client, { instructions, input, max: 8000 });
     const j = extractJson(text);
     return {
       consensus: arr(j.consensus),
@@ -157,9 +178,9 @@ export function mockAdvice(adviser: Adviser, topic: string): Advice {
     name: adviser.name,
     role: adviser.role,
     emoji: adviser.emoji,
-    body: `(mock) From a ${adviser.role} perspective on "${topic}": ${adviser.lens.toLowerCase()} are what matter most here. Add API keys to hear the real ${adviser.name}.`,
+    body: `(mock) From a ${adviser.role} perspective on "${topic}": ${adviser.lens.toLowerCase()} are what matter most here. Add an OpenAI API key to hear the real ${adviser.name}.`,
     bottomLine: `Proceed carefully, watching ${adviser.lens.split(",")[0].toLowerCase()}.`,
-    model: `${ANTHROPIC_MODEL} (mock)`,
+    model: `${COUNCIL_MODEL} (mock)`,
   };
 }
 
