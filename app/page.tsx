@@ -1,5 +1,5 @@
-import DebateApp from "@/components/DebateApp";
+import AppShell from "@/components/AppShell";
 
 export default function Home() {
-  return <DebateApp />;
+  return <AppShell />;
 }
