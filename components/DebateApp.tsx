@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import DebateBoard from "./DebateBoard";
 import DebateHistory from "./DebateHistory";
+import { MicButton } from "./voice";
 import {
   addToHistory,
   clearHistory,
@@ -316,6 +317,11 @@ export default function DebateApp({
               padding: "16px 18px",
               color: "#14141C",
             }}
+          />
+          <MicButton
+            language="auto"
+            title="Speak the motion"
+            onText={(t) => setMotion((prev) => (prev ? prev + " " + t : t))}
           />
           <button
             onClick={run}

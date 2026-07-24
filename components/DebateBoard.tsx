@@ -5,6 +5,7 @@ import type {
   Turn,
   Verdict,
 } from "@/lib/types";
+import { PlayButton } from "./voice";
 
 const A_COLOR = "#FF6B4A";
 const A_TINT = "#FFF1EC";
@@ -81,8 +82,11 @@ function TurnCard({ turn }: { turn: Turn }) {
         >
           {turn.phase}
         </span>
+        <span className="ml-auto">
+          <PlayButton text={turn.text} />
+        </span>
       </div>
-      <p style={{ fontSize: 14, lineHeight: 1.6, color: "#3A3A48", whiteSpace: "pre-wrap" }}>
+      <p dir="auto" style={{ fontSize: 14, lineHeight: 1.6, color: "#3A3A48", whiteSpace: "pre-wrap" }}>
         {turn.text}
       </p>
     </div>
@@ -240,7 +244,14 @@ export default function DebateBoard({
             boxShadow: "0 24px 60px rgba(20,20,28,.10)",
           }}
         >
-          <h3 style={{ fontWeight: 700, color: "#14141C" }}>Summary</h3>
+          <div className="flex items-center gap-2">
+            <h3 style={{ fontWeight: 700, color: "#14141C" }}>Summary</h3>
+            <span className="ml-auto">
+              <PlayButton
+                text={`Side A's reasoning: ${summary.sideAReasoning}. Side B's counter: ${summary.sideBCounter}. Takeaway: ${summary.takeaway}`}
+              />
+            </span>
+          </div>
           <div className="grid sm:grid-cols-2 gap-4" style={{ fontSize: 14 }}>
             <div>
               <div style={{ color: A_COLOR, fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
