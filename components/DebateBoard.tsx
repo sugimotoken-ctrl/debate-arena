@@ -6,6 +6,11 @@ import type {
   Verdict,
 } from "@/lib/types";
 
+const A_COLOR = "#FF6B4A";
+const A_TINT = "#FFF1EC";
+const B_COLOR = "#6C5CFF";
+const B_TINT = "#F1EFFF";
+
 const VERDICT_LABEL: Record<Verdict, string> = {
   ongoing: "In progress",
   converged: "Converged — they reached agreement",
@@ -14,23 +19,29 @@ const VERDICT_LABEL: Record<Verdict, string> = {
 };
 
 const VERDICT_COLOR: Record<Verdict, string> = {
-  ongoing: "bg-slate-600",
-  converged: "bg-emerald-600",
-  impasse: "bg-rose-600",
-  timeout: "bg-amber-600",
+  ongoing: "#8A8A9A",
+  converged: "#12B981",
+  impasse: "#FF4D9D",
+  timeout: "#FF9F1C",
 };
 
 export function AgreementMeter({ score }: { score: number }) {
   return (
     <div className="w-full">
-      <div className="flex justify-between text-xs text-slate-400 mb-1">
+      <div className="flex justify-between mb-1" style={{ fontSize: 12, color: "#8A8A9A" }}>
         <span>Common ground</span>
         <span className="tabular-nums">{score}%</span>
       </div>
-      <div className="h-3 rounded-full bg-slate-800 overflow-hidden">
+      <div
+        className="h-3 rounded-full overflow-hidden"
+        style={{ background: "#EDEEF4" }}
+      >
         <div
-          className="h-full rounded-full bg-gradient-to-r from-claude to-gpt transition-all duration-700"
-          style={{ width: `${score}%` }}
+          className="h-full rounded-full transition-all duration-700"
+          style={{
+            width: `${score}%`,
+            background: "linear-gradient(90deg,#FF6B4A,#6C5CFF)",
+          }}
         />
       </div>
     </div>
@@ -39,27 +50,39 @@ export function AgreementMeter({ score }: { score: number }) {
 
 function TurnCard({ turn }: { turn: Turn }) {
   const isA = turn.side === "A";
+  const color = isA ? A_COLOR : B_COLOR;
+  const tint = isA ? A_TINT : B_TINT;
   return (
     <div
-      className={`rounded-xl p-4 border ${
-        isA
-          ? "bg-claude-soft/5 border-claude/40"
-          : "bg-gpt-soft/5 border-gpt/40"
-      }`}
+      className="bg-white"
+      style={{
+        border: `1px solid ${color}44`,
+        borderRadius: 16,
+        padding: 16,
+        boxShadow: `0 8px 22px ${color}14`,
+      }}
     >
       <div className="flex items-center gap-2 mb-2">
         <span
-          className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-            isA ? "bg-claude/20 text-claude" : "bg-gpt/20 text-gpt"
-          }`}
+          className="rounded-full"
+          style={{
+            background: tint,
+            color,
+            fontWeight: 700,
+            fontSize: 12,
+            padding: "3px 10px",
+          }}
         >
           {isA ? "Side A · Claude" : "Side B · GPT"}
         </span>
-        <span className="text-[10px] uppercase tracking-wide text-slate-500">
+        <span
+          className="uppercase"
+          style={{ fontSize: 10, letterSpacing: 1, color: "#9A9AAC" }}
+        >
           {turn.phase}
         </span>
       </div>
-      <p className="text-sm leading-relaxed text-slate-200 whitespace-pre-wrap">
+      <p style={{ fontSize: 14, lineHeight: 1.6, color: "#3A3A48", whiteSpace: "pre-wrap" }}>
         {turn.text}
       </p>
     </div>
@@ -88,7 +111,6 @@ export default function DebateBoard({
       ? moderations[moderations.length - 1].agreementScore
       : 0;
 
-  // Group turns by round.
   const rounds = new Map<number, Turn[]>();
   for (const t of turns) {
     if (!rounds.has(t.round)) rounds.set(t.round, []);
@@ -97,24 +119,41 @@ export default function DebateBoard({
 
   return (
     <div className="space-y-6">
-      <div className="rounded-xl border border-slate-700 bg-slate-900/50 p-4 space-y-3">
+      <div
+        className="bg-white space-y-3"
+        style={{
+          border: "1px solid rgba(20,20,28,.08)",
+          borderRadius: 20,
+          padding: 18,
+          boxShadow: "0 12px 30px rgba(20,20,28,.06)",
+        }}
+      >
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold text-white">{config.topic}</h2>
+          <h2 style={{ fontSize: 18, fontWeight: 700, color: "#14141C" }}>
+            {config.topic}
+          </h2>
           <span
-            className={`text-xs font-medium text-white px-3 py-1 rounded-full ${VERDICT_COLOR[verdict]}`}
+            className="rounded-full"
+            style={{
+              background: VERDICT_COLOR[verdict],
+              color: "#fff",
+              fontSize: 12,
+              fontWeight: 600,
+              padding: "5px 12px",
+            }}
           >
             {VERDICT_LABEL[verdict]}
           </span>
         </div>
-        <div className="grid sm:grid-cols-2 gap-3 text-sm">
-          <div className="rounded-lg bg-claude/10 border border-claude/30 p-3">
-            <div className="text-claude font-semibold text-xs mb-1">
+        <div className="grid sm:grid-cols-2 gap-3" style={{ fontSize: 14 }}>
+          <div style={{ background: A_TINT, borderRadius: 12, padding: 12, color: "#3A3A48" }}>
+            <div style={{ color: A_COLOR, fontWeight: 700, fontSize: 12, marginBottom: 4 }}>
               SIDE A · Claude
             </div>
             {config.stanceA}
           </div>
-          <div className="rounded-lg bg-gpt/10 border border-gpt/30 p-3">
-            <div className="text-gpt font-semibold text-xs mb-1">
+          <div style={{ background: B_TINT, borderRadius: 12, padding: 12, color: "#3A3A48" }}>
+            <div style={{ color: B_COLOR, fontWeight: 700, fontSize: 12, marginBottom: 4 }}>
               SIDE B · GPT
             </div>
             {config.stanceB}
@@ -122,7 +161,7 @@ export default function DebateBoard({
         </div>
         <AgreementMeter score={latestScore} />
         {mock && (
-          <p className="text-xs text-amber-400">
+          <p style={{ fontSize: 12, color: "#C06A2B" }}>
             ⚠ Running in mock mode — add API keys to use the real models.
           </p>
         )}
@@ -135,7 +174,7 @@ export default function DebateBoard({
           const mod = moderations.find((m) => m.round === roundNum);
           return (
             <div key={roundNum} className="space-y-3">
-              <div className="text-xs uppercase tracking-widest text-slate-500">
+              <div className="uppercase" style={{ fontSize: 11, letterSpacing: 2, color: "#9A9AAC" }}>
                 Round {roundNum + 1} · {roundTurns[0]?.phase}
               </div>
               <div className="grid md:grid-cols-2 gap-3">
@@ -144,27 +183,35 @@ export default function DebateBoard({
                 ))}
               </div>
               {mod && (
-                <details className="rounded-lg border border-slate-800 bg-slate-900/40 p-3 text-sm">
-                  <summary className="cursor-pointer text-slate-300">
+                <details
+                  className="bg-white"
+                  style={{
+                    border: "1px solid rgba(20,20,28,.08)",
+                    borderRadius: 12,
+                    padding: 12,
+                    fontSize: 14,
+                  }}
+                >
+                  <summary style={{ cursor: "pointer", color: "#3A3A48" }}>
                     Moderator · {mod.agreementScore}% common ground —{" "}
-                    <span className="text-slate-400">{mod.note}</span>
+                    <span style={{ color: "#8A8A9A" }}>{mod.note}</span>
                   </summary>
                   <div className="grid sm:grid-cols-2 gap-3 mt-3">
                     <div>
-                      <div className="text-emerald-400 text-xs font-semibold mb-1">
+                      <div style={{ color: "#0E9E6E", fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
                         Points of agreement
                       </div>
-                      <ul className="list-disc list-inside text-slate-300 space-y-1">
+                      <ul className="list-disc list-inside space-y-1" style={{ color: "#3A3A48" }}>
                         {mod.agreements.map((a, i) => (
                           <li key={i}>{a}</li>
                         ))}
                       </ul>
                     </div>
                     <div>
-                      <div className="text-rose-400 text-xs font-semibold mb-1">
+                      <div style={{ color: "#FF4D9D", fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
                         Still contested
                       </div>
-                      <ul className="list-disc list-inside text-slate-300 space-y-1">
+                      <ul className="list-disc list-inside space-y-1" style={{ color: "#3A3A48" }}>
                         {mod.contested.map((c, i) => (
                           <li key={i}>{c}</li>
                         ))}
@@ -178,52 +225,60 @@ export default function DebateBoard({
         })}
 
       {running && (
-        <div className="text-center text-slate-400 text-sm py-4 animate-pulse">
+        <div className="text-center py-4 animate-pulse" style={{ color: "#8A8A9A", fontSize: 14 }}>
           Debating…
         </div>
       )}
 
       {summary && (
-        <div className="rounded-xl border border-slate-600 bg-gradient-to-b from-slate-900 to-slate-900/50 p-5 space-y-3">
-          <h3 className="text-white font-semibold">Summary</h3>
-          <div className="grid sm:grid-cols-2 gap-4 text-sm">
+        <div
+          className="bg-white space-y-3"
+          style={{
+            border: "1px solid rgba(20,20,28,.08)",
+            borderRadius: 20,
+            padding: 20,
+            boxShadow: "0 24px 60px rgba(20,20,28,.10)",
+          }}
+        >
+          <h3 style={{ fontWeight: 700, color: "#14141C" }}>Summary</h3>
+          <div className="grid sm:grid-cols-2 gap-4" style={{ fontSize: 14 }}>
             <div>
-              <div className="text-claude text-xs font-semibold mb-1">
+              <div style={{ color: A_COLOR, fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
                 Side A&apos;s reasoning
               </div>
-              <p className="text-slate-300">{summary.sideAReasoning}</p>
+              <p style={{ color: "#3A3A48" }}>{summary.sideAReasoning}</p>
             </div>
             <div>
-              <div className="text-gpt text-xs font-semibold mb-1">
+              <div style={{ color: B_COLOR, fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
                 Side B&apos;s counter
               </div>
-              <p className="text-slate-300">{summary.sideBCounter}</p>
+              <p style={{ color: "#3A3A48" }}>{summary.sideBCounter}</p>
             </div>
           </div>
-          <div className="grid sm:grid-cols-2 gap-4 text-sm">
+          <div className="grid sm:grid-cols-2 gap-4" style={{ fontSize: 14 }}>
             <div>
-              <div className="text-emerald-400 text-xs font-semibold mb-1">
+              <div style={{ color: "#0E9E6E", fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
                 Where they agreed
               </div>
-              <ul className="list-disc list-inside text-slate-300 space-y-1">
+              <ul className="list-disc list-inside space-y-1" style={{ color: "#3A3A48" }}>
                 {summary.agreements.map((a, i) => (
                   <li key={i}>{a}</li>
                 ))}
               </ul>
             </div>
             <div>
-              <div className="text-rose-400 text-xs font-semibold mb-1">
+              <div style={{ color: "#FF4D9D", fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
                 Where they didn&apos;t
               </div>
-              <ul className="list-disc list-inside text-slate-300 space-y-1">
+              <ul className="list-disc list-inside space-y-1" style={{ color: "#3A3A48" }}>
                 {summary.disagreements.map((d, i) => (
                   <li key={i}>{d}</li>
                 ))}
               </ul>
             </div>
           </div>
-          <p className="text-sm text-slate-200 border-t border-slate-700 pt-3">
-            <span className="text-slate-500">Takeaway: </span>
+          <p style={{ fontSize: 14, color: "#14141C", borderTop: "1px solid rgba(20,20,28,.08)", paddingTop: 12 }}>
+            <span style={{ color: "#8A8A9A" }}>Takeaway: </span>
             {summary.takeaway}
           </p>
         </div>

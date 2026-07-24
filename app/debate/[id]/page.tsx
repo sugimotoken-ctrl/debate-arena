@@ -15,14 +15,22 @@ export default async function DebatePage({
   if (!debate) notFound();
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
+    <div className="mx-auto px-6 py-8 space-y-6" style={{ maxWidth: 1000 }}>
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-white">⚖️ Debate Arena</h1>
+        <h1 className="font-display brand-text" style={{ fontSize: 28 }}>
+          ⚖️ DEBATE ARENA
+        </h1>
         <Link
           href="/"
-          className="text-sm px-4 py-2 rounded-lg bg-white text-slate-900 font-semibold hover:bg-slate-200"
+          className="debate-fill font-display"
+          style={{
+            fontSize: 14,
+            color: "#fff",
+            padding: "8px 18px",
+            borderRadius: 12,
+          }}
         >
-          New debate
+          NEW DEBATE
         </Link>
       </div>
       <DebateBoard

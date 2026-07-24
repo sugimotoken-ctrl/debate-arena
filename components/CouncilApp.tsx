@@ -21,13 +21,18 @@ const LANGS: { id: Lang; label: string }[] = [
 
 const ORDER = ADVISERS.map((a) => a.id);
 
-export default function CouncilApp() {
+export default function CouncilApp({
+  onSwitchToDebate,
+}: {
+  onSwitchToDebate?: () => void;
+}) {
   const [topic, setTopic] = useState("");
   const [context, setContext] = useState("");
   const [language, setLanguage] = useState<Lang>("auto");
   const [selected, setSelected] = useState<Set<string>>(
     new Set(["cfo", "cmo", "coo", "investor", "contrarian"]),
   );
+  const [convened, setConvened] = useState(false);
 
   const [advices, setAdvices] = useState<Advice[]>([]);
   const [synthesis, setSynthesis] = useState<CouncilSynthesis | null>(null);
@@ -39,8 +44,15 @@ export default function CouncilApp() {
   const sortedAdvices = [...advices].sort(
     (a, b) => ORDER.indexOf(a.adviserId) - ORDER.indexOf(b.adviserId),
   );
+  const seated = ADVISERS.filter((a) => selected.has(a.id));
+  const seatedArc = seated.slice(0, 6);
+
+  function reset() {
+    setConvened(false);
+  }
 
   function toggle(id: string) {
+    reset();
     setSelected((prev) => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
@@ -60,12 +72,12 @@ export default function CouncilApp() {
     setError(null);
     setAdvices([]);
     setSynthesis(null);
+    setConvened(true);
     setPhase("advising");
 
     const ids = [...selected];
     const collected: Advice[] = [];
 
-    // Each adviser is its own request, so answers stream in as they finish.
     await Promise.all(
       ids.map(async (id) => {
         try {
@@ -102,270 +114,512 @@ export default function CouncilApp() {
       const synthData = await synthRes.json();
       setSynthesis(synthData.synthesis ?? null);
     } catch {
-      // synthesis is best-effort
+      /* best effort */
     } finally {
       setPhase("idle");
     }
   }
 
-  return (
-    <div className="max-w-4xl mx-auto px-4 py-8 space-y-8">
-      <header className="text-center space-y-2">
-        <h1 className="text-3xl font-bold text-white">🏛️ The Council</h1>
-        <p className="text-slate-400 text-sm">
-          Bring a decision to your advisory board — powered by{" "}
-          <span className="text-gpt font-medium">ChatGPT (GPT-5.5 Pro)</span>.
-          Speak or type your topic, hear each adviser, then the Chair
-          synthesizes a recommendation.
-        </p>
-      </header>
+  const topicShown = topic.trim() || "your decision";
 
-      <div className="rounded-xl border border-slate-700 bg-slate-900/50 p-5 space-y-4">
-        {/* Language */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-slate-500">Language:</span>
-          {LANGS.map((l) => (
-            <button
-              key={l.id}
-              onClick={() => setLanguage(l.id)}
-              className={`text-xs px-2.5 py-1 rounded-full border ${
-                language === l.id
-                  ? "bg-gpt/20 border-gpt text-gpt"
-                  : "bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200"
-              }`}
+  return (
+    <div
+      className="mx-auto px-10 pb-20"
+      style={{ maxWidth: 1000 }}
+    >
+      {/* Hero */}
+      <div className="text-center">
+        <h1
+          className="font-display brand-text uppercase mx-auto"
+          style={{
+            fontSize: "clamp(48px,7.5vw,96px)",
+            letterSpacing: 1,
+            lineHeight: 0.92,
+          }}
+        >
+          🏛️ The Council
+        </h1>
+        <p
+          className="mx-auto mt-4"
+          style={{ maxWidth: 620, fontSize: 18, lineHeight: 1.55, color: "#5C5C6E" }}
+        >
+          Bring a decision to your advisory board — powered by{" "}
+          <b style={{ color: "#12B981" }}>ChatGPT (GPT-5.5 Pro)</b>. Speak or type
+          your topic, hear each adviser, then the Chair synthesizes a
+          recommendation.
+        </p>
+      </div>
+
+      {/* Seated arc */}
+      <div
+        className="relative mx-auto mt-6"
+        style={{ height: 190, maxWidth: 720 }}
+      >
+        {seatedArc.map((a, i) => {
+          const n = seatedArc.length;
+          const t = n > 1 ? i / (n - 1) : 0.5;
+          const angle = Math.PI * (0.85 - 0.7 * t);
+          const left = 50 + 42 * Math.cos(angle);
+          const top = 150 - 80 * Math.sin(angle);
+          return (
+            <div
+              key={a.id}
+              className="absolute text-center"
+              style={{
+                left: `${left}%`,
+                top: `${top}px`,
+                transform: "translate(-50%,-50%)",
+                width: 100,
+                animation: "floaty 5s ease-in-out infinite",
+                animationDelay: `${i * 0.35}s`,
+              }}
             >
-              {l.label}
-            </button>
-          ))}
-          <span className="text-xs text-slate-600 ml-1">
-            (voice input & adviser replies)
+              <div
+                className="mx-auto grid place-items-center"
+                style={{
+                  width: 62,
+                  height: 62,
+                  borderRadius: 18,
+                  border: "3px solid #fff",
+                  background: a.tint,
+                  fontSize: 28,
+                  boxShadow: `0 10px 22px ${a.color}55`,
+                }}
+              >
+                {a.emoji}
+              </div>
+              <div
+                style={{ fontSize: 13, fontWeight: 700, color: "#3A3A48", marginTop: 6 }}
+              >
+                {a.name.replace(/^The /, "")}
+              </div>
+            </div>
+          );
+        })}
+        {/* Chair orb */}
+        <div
+          className="absolute grid place-items-center"
+          style={{ left: "50%", top: 150, transform: "translate(-50%,-50%)", width: 82, height: 82 }}
+        >
+          <div
+            className="absolute inset-0 rounded-full"
+            style={{
+              background:
+                "conic-gradient(from 0deg,#FF6B4A,#FF9F1C,#12B981,#2E7BFF,#6C5CFF,#FF6B4A)",
+              animation: "spin360 9s linear infinite",
+            }}
+          />
+          <div
+            className="absolute grid place-items-center rounded-full"
+            style={{ inset: 4, background: "#fff", fontSize: 32 }}
+          >
+            🪑
+          </div>
+        </div>
+      </div>
+
+      {/* Console card */}
+      <div
+        className="relative bg-white overflow-hidden"
+        style={{
+          border: "1px solid rgba(20,20,28,.08)",
+          borderRadius: 28,
+          padding: 32,
+          boxShadow: "0 30px 70px rgba(20,20,28,.10)",
+        }}
+      >
+        <div
+          className="brand-fill absolute left-0 right-0 top-0"
+          style={{ height: 6 }}
+        />
+
+        {/* Step 1 */}
+        <StepHeader n="1" color="#12B981" label="SPEAK OR TYPE" />
+
+        {/* Language */}
+        <div className="flex flex-wrap items-center gap-2 mt-4">
+          <span style={{ fontWeight: 700, fontSize: 14, color: "#6B6B7B" }}>
+            Language:
+          </span>
+          {LANGS.map((l) => {
+            const on = language === l.id;
+            return (
+              <button
+                key={l.id}
+                onClick={() => {
+                  reset();
+                  setLanguage(l.id);
+                }}
+                className="rounded-full transition"
+                style={{
+                  padding: "6px 14px",
+                  fontWeight: 700,
+                  fontSize: 13.5,
+                  background: on ? "#E9FBF4" : "#F6F7FB",
+                  border: on
+                    ? "1.5px solid #12B981"
+                    : "1.5px solid rgba(20,20,28,.1)",
+                  color: on ? "#0E9E6E" : "#6B6B7B",
+                }}
+              >
+                {l.label}
+              </button>
+            );
+          })}
+          <span style={{ fontSize: 13.5, color: "#9A9AAC" }}>
+            (voice input &amp; adviser replies)
           </span>
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          <span className="text-xs text-slate-500 self-center">Try:</span>
+        {/* Topic */}
+        <FieldLabel>Topic / decision</FieldLabel>
+        <div className="flex gap-3 items-start">
+          <input
+            value={topic}
+            dir="auto"
+            onChange={(e) => {
+              reset();
+              setTopic(e.target.value);
+            }}
+            placeholder="Type, or tap the mic to speak…"
+            className="flex-1 outline-none"
+            style={fieldStyle(!!topic.trim())}
+          />
+          <MicButton
+            language={language}
+            title="Speak your topic"
+            onText={(txt) => {
+              reset();
+              setTopic((p) => (p ? p + " " + txt : txt));
+            }}
+          />
+        </div>
+
+        {/* Example chips */}
+        <div className="flex flex-wrap gap-2 mt-3">
           {EXAMPLES.map((e, i) => (
             <button
               key={i}
-              onClick={() => setTopic(e)}
-              className="text-xs px-2.5 py-1 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300"
+              onClick={() => {
+                reset();
+                setTopic(e);
+              }}
+              className="rounded-full"
+              style={{
+                padding: "5px 12px",
+                fontSize: 12.5,
+                background: "#F6F7FB",
+                border: "1px solid rgba(20,20,28,.08)",
+                color: "#6B6B7B",
+              }}
             >
               {e}
             </button>
           ))}
         </div>
 
-        {/* Topic with mic */}
-        <div>
-          <label className="block text-sm text-slate-300 mb-1">
-            Topic / decision
-          </label>
-          <div className="flex gap-2">
-            <input
-              value={topic}
-              dir="auto"
-              onChange={(e) => setTopic(e.target.value)}
-              placeholder="Type, or tap the mic to speak…"
-              className="flex-1 rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-slate-500"
-            />
-            <MicButton
-              language={language}
-              title="Speak your topic"
-              onText={(t) => setTopic((prev) => (prev ? prev + " " + t : t))}
-            />
+        {/* Context */}
+        <FieldLabel>
+          Context <span style={{ color: "#9A9AAC" }}>(optional)</span>
+        </FieldLabel>
+        <div className="flex gap-3 items-start">
+          <textarea
+            value={context}
+            dir="auto"
+            onChange={(e) => {
+              reset();
+              setContext(e.target.value);
+            }}
+            placeholder="Background for the advisers — stage, market, constraints…"
+            className="flex-1 outline-none resize-y"
+            style={{ ...fieldStyle(!!context.trim()), minHeight: 84 }}
+          />
+          <MicButton
+            language={language}
+            title="Speak context"
+            onText={(txt) => {
+              reset();
+              setContext((p) => (p ? p + " " + txt : txt));
+            }}
+          />
+        </div>
+
+        {/* Step 2 */}
+        <div className="flex items-center gap-3 mt-7 flex-wrap">
+          <StepHeader n="2" color="#6C5CFF" label="WHO'S IN THE ROOM?" inline />
+          <span
+            className="rounded-full"
+            style={{
+              background: "#E9FBF4",
+              color: "#0E9E6E",
+              fontWeight: 700,
+              fontSize: 13,
+              padding: "5px 12px",
+            }}
+          >
+            {selected.size} seated
+          </span>
+          <div className="ml-auto flex gap-3">
+            <button
+              onClick={() => {
+                reset();
+                setSelected(new Set(ADVISERS.map((a) => a.id)));
+              }}
+              style={{ color: "#6C5CFF", fontWeight: 700, fontSize: 14 }}
+            >
+              All
+            </button>
+            <button
+              onClick={() => {
+                reset();
+                setSelected(new Set());
+              }}
+              style={{ color: "#9A9AAC", fontWeight: 700, fontSize: 14 }}
+            >
+              None
+            </button>
           </div>
         </div>
 
-        {/* Context with mic */}
-        <div>
-          <label className="block text-sm text-slate-300 mb-1">
-            Context <span className="text-slate-500">(optional)</span>
-          </label>
-          <div className="flex gap-2">
-            <textarea
-              value={context}
-              dir="auto"
-              onChange={(e) => setContext(e.target.value)}
-              rows={2}
-              placeholder="Background for the advisers — stage, market, constraints…"
-              className="flex-1 rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-slate-500"
-            />
-            <MicButton
-              language={language}
-              title="Speak context"
-              onText={(t) => setContext((prev) => (prev ? prev + " " + t : t))}
-            />
-          </div>
-        </div>
-
-        {/* Seats */}
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <label className="block text-sm text-slate-300">
-              Who&apos;s in the room?{" "}
-              <span className="text-slate-500">({selected.size} selected)</span>
-            </label>
-            <div className="flex gap-2">
+        {/* Adviser grid */}
+        <div className="grid sm:grid-cols-2 gap-3 mt-4">
+          {ADVISERS.map((a) => {
+            const on = selected.has(a.id);
+            return (
               <button
-                onClick={() => setSelected(new Set(ADVISERS.map((a) => a.id)))}
-                className="text-xs text-slate-400 hover:text-white"
+                key={a.id}
+                onClick={() => toggle(a.id)}
+                className="flex items-center gap-3 text-left transition hover:-translate-y-[3px]"
+                style={{
+                  borderRadius: 16,
+                  padding: 15,
+                  background: on ? a.tint : "#fff",
+                  border: on
+                    ? `2px solid ${a.color}`
+                    : "2px solid rgba(20,20,28,.1)",
+                  boxShadow: on
+                    ? `0 10px 26px ${a.color}33`
+                    : "0 2px 8px rgba(20,20,28,.04)",
+                }}
               >
-                All
-              </button>
-              <button
-                onClick={() => setSelected(new Set())}
-                className="text-xs text-slate-400 hover:text-white"
-              >
-                None
-              </button>
-            </div>
-          </div>
-          <div className="grid sm:grid-cols-2 gap-2">
-            {ADVISERS.map((a) => {
-              const on = selected.has(a.id);
-              return (
-                <button
-                  key={a.id}
-                  onClick={() => toggle(a.id)}
-                  className={`flex items-start gap-3 text-left rounded-lg border p-3 transition ${
-                    on
-                      ? "border-emerald-500/60 bg-emerald-500/10"
-                      : "border-slate-800 bg-slate-800/40 hover:border-slate-600"
-                  }`}
+                <span
+                  className="grid place-items-center shrink-0"
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: 12,
+                    background: a.tint,
+                    fontSize: 23,
+                    boxShadow: `0 6px 14px ${a.color}40`,
+                  }}
                 >
-                  <span className="text-xl leading-none">{a.emoji}</span>
-                  <span className="min-w-0">
-                    <span className="block text-sm text-white">
-                      {a.name}{" "}
-                      <span className="text-slate-500 text-xs">· {a.role}</span>
+                  {a.emoji}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block" style={{ fontSize: 15 }}>
+                    <b style={{ color: "#14141C" }}>{a.name}</b>{" "}
+                    <span style={{ color: "#8A8A9A", fontWeight: 500 }}>
+                      · {a.role}
                     </span>
-                    <span className="block text-xs text-slate-400">{a.lens}</span>
                   </span>
                   <span
-                    className={`ml-auto text-xs ${on ? "text-emerald-400" : "text-slate-600"}`}
+                    className="block truncate"
+                    style={{ fontSize: 13, color: "#8A8A9A" }}
                   >
-                    {on ? "✓" : "+"}
+                    {a.lens}
                   </span>
-                </button>
-              );
-            })}
-          </div>
+                </span>
+                <span
+                  className="grid place-items-center shrink-0"
+                  style={{
+                    width: 22,
+                    height: 22,
+                    borderRadius: 7,
+                    background: on ? a.color : "#fff",
+                    border: on ? "none" : "2px solid rgba(20,20,28,.2)",
+                    color: on ? "#fff" : "#B8B8C6",
+                    fontSize: 13,
+                    fontWeight: 800,
+                  }}
+                >
+                  {on ? "✓" : "+"}
+                </span>
+              </button>
+            );
+          })}
         </div>
 
-        <div className="flex items-center gap-3">
-          <button
-            onClick={convene}
-            disabled={running}
-            className="px-5 py-2 rounded-lg bg-white text-slate-900 font-semibold text-sm hover:bg-slate-200 disabled:opacity-50"
+        {/* Convene */}
+        <button
+          onClick={convene}
+          disabled={running}
+          className="brand-fill font-display w-full mt-6 disabled:opacity-60"
+          style={{
+            fontSize: 20,
+            letterSpacing: 1.5,
+            color: "#fff",
+            padding: "16px 30px",
+            borderRadius: 16,
+            boxShadow: "0 14px 34px rgba(108,92,255,.28)",
+          }}
+        >
+          {phase === "advising"
+            ? "ADVISERS DELIBERATING…"
+            : phase === "synth"
+              ? "CHAIR SYNTHESIZING…"
+              : "🏛️ CONVENE MEETING"}
+        </button>
+
+        {error && (
+          <p style={{ color: "#FF6B4A", fontSize: 14, marginTop: 10 }}>{error}</p>
+        )}
+        {convened && !error && (
+          <div
+            className="anim-pop"
+            style={{ marginTop: 16, color: "#6C5CFF", fontWeight: 600, fontSize: 15 }}
           >
-            {phase === "advising"
-              ? "Advisers deliberating…"
-              : phase === "synth"
-                ? "Chair synthesizing…"
-                : "Convene meeting"}
-          </button>
-          {error && <span className="text-rose-400 text-sm">{error}</span>}
-        </div>
+            Convening {selected.size} advisers on “{topicShown}” — the Chair will
+            synthesize their recommendation.
+          </div>
+        )}
       </div>
 
+      <p className="text-center mt-6" style={{ fontSize: 13, color: "#9A9AAC" }}>
+        Each adviser weighs in from their lens · the Chair synthesizes a final
+        recommendation
+      </p>
+
       {mock && advices.length > 0 && (
-        <p className="text-xs text-amber-400 text-center">
+        <p className="text-center mt-4" style={{ fontSize: 13, color: "#C06A2B" }}>
           ⚠ Running in mock mode — add an OpenAI API key to hear the real advisers.
         </p>
       )}
 
+      {/* Results */}
       {(advices.length > 0 || phase === "advising") && (
-        <div className="space-y-3">
-          <h2 className="text-lg font-semibold text-white">Around the table</h2>
-          <div className="grid md:grid-cols-2 gap-3">
-            {sortedAdvices.map((a) => (
-              <div
-                key={a.adviserId}
-                className="rounded-xl border border-slate-700 bg-slate-900/50 p-4"
-              >
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-xl">{a.emoji}</span>
-                  <span className="text-sm font-semibold text-white">
-                    {a.name}
-                  </span>
-                  <span className="text-xs text-slate-500">· {a.role}</span>
-                  <span className="ml-auto">
-                    <PlayButton
-                      text={`${a.body}. ${a.bottomLine}`}
-                    />
-                  </span>
-                </div>
-                <p
-                  dir="auto"
-                  className="text-sm text-slate-200 leading-relaxed whitespace-pre-wrap"
+        <div className="mt-8">
+          <h2 className="font-display" style={{ fontSize: 24, letterSpacing: 0.5 }}>
+            AROUND THE TABLE
+          </h2>
+          <div className="grid md:grid-cols-2 gap-4 mt-4">
+            {sortedAdvices.map((a) => {
+              const adv = ADVISERS.find((x) => x.id === a.adviserId);
+              const color = adv?.color || "#6C5CFF";
+              const tint = adv?.tint || "#F1EFFF";
+              return (
+                <div
+                  key={a.adviserId}
+                  className="bg-white"
+                  style={{
+                    border: `1px solid ${color}44`,
+                    borderRadius: 20,
+                    padding: 18,
+                    boxShadow: `0 12px 30px ${color}1a`,
+                  }}
                 >
-                  {a.body}
-                </p>
-                {a.bottomLine && (
+                  <div className="flex items-center gap-2 mb-2">
+                    <span
+                      className="grid place-items-center"
+                      style={{
+                        width: 34,
+                        height: 34,
+                        borderRadius: 10,
+                        background: tint,
+                        fontSize: 18,
+                      }}
+                    >
+                      {a.emoji}
+                    </span>
+                    <span style={{ fontWeight: 700, color: "#14141C" }}>
+                      {a.name}
+                    </span>
+                    <span style={{ fontSize: 12, color: "#8A8A9A" }}>· {a.role}</span>
+                    <span className="ml-auto">
+                      <PlayButton text={`${a.body}. ${a.bottomLine}`} />
+                    </span>
+                  </div>
                   <p
                     dir="auto"
-                    className="mt-3 text-sm text-emerald-300 border-t border-slate-800 pt-2"
+                    style={{ fontSize: 14, lineHeight: 1.6, color: "#3A3A48", whiteSpace: "pre-wrap" }}
                   >
-                    <span className="text-slate-500">Bottom line: </span>
-                    {a.bottomLine}
+                    {a.body}
                   </p>
-                )}
-              </div>
-            ))}
-            {phase === "advising" &&
-              [...selected].length > advices.length && (
-                <div className="rounded-xl border border-slate-800 bg-slate-900/30 p-4 text-sm text-slate-500 animate-pulse grid place-items-center">
-                  {[...selected].length - advices.length} more adviser(s)
-                  thinking…
+                  {a.bottomLine && (
+                    <p
+                      dir="auto"
+                      style={{
+                        marginTop: 10,
+                        paddingTop: 8,
+                        borderTop: "1px solid rgba(20,20,28,.08)",
+                        fontSize: 14,
+                        color,
+                        fontWeight: 600,
+                      }}
+                    >
+                      Bottom line: {a.bottomLine}
+                    </p>
+                  )}
                 </div>
-              )}
+              );
+            })}
+            {phase === "advising" && [...selected].length > advices.length && (
+              <div
+                className="grid place-items-center animate-pulse"
+                style={{
+                  border: "1px dashed rgba(20,20,28,.15)",
+                  borderRadius: 20,
+                  padding: 18,
+                  color: "#9A9AAC",
+                  fontSize: 14,
+                }}
+              >
+                {[...selected].length - advices.length} more adviser(s) thinking…
+              </div>
+            )}
           </div>
         </div>
       )}
 
       {phase === "synth" && (
-        <div className="text-center text-slate-400 text-sm py-2 animate-pulse">
+        <p className="text-center mt-4 animate-pulse" style={{ color: "#6C5CFF" }}>
           The Chair is synthesizing…
-        </div>
+        </p>
       )}
 
       {synthesis && (
-        <div className="rounded-xl border border-slate-600 bg-gradient-to-b from-slate-900 to-slate-900/50 p-5 space-y-4">
+        <div
+          className="bg-white mt-6"
+          style={{
+            border: "1px solid rgba(20,20,28,.08)",
+            borderRadius: 24,
+            padding: 24,
+            boxShadow: "0 24px 60px rgba(20,20,28,.10)",
+          }}
+        >
           <div className="flex items-center gap-2">
-            <h3 className="text-white font-semibold">🪑 Chair&apos;s synthesis</h3>
+            <h3 className="font-display" style={{ fontSize: 22 }}>
+              🪑 CHAIR&apos;S SYNTHESIS
+            </h3>
             <span className="ml-auto">
-              <PlayButton
-                text={`Recommendation: ${synthesis.recommendation}`}
-              />
+              <PlayButton text={`Recommendation: ${synthesis.recommendation}`} />
             </span>
           </div>
-          <div className="rounded-lg bg-white/5 border border-slate-700 p-3">
-            <div className="text-xs text-slate-500 mb-1">Recommendation</div>
-            <p dir="auto" className="text-sm text-slate-100">
+          <div
+            className="mt-3"
+            style={{ background: "#F6F7FB", borderRadius: 14, padding: 14 }}
+          >
+            <div style={{ fontSize: 12, color: "#8A8A9A", marginBottom: 4 }}>
+              Recommendation
+            </div>
+            <p dir="auto" style={{ fontSize: 15, color: "#14141C" }}>
               {synthesis.recommendation}
             </p>
           </div>
-          <div className="grid sm:grid-cols-2 gap-4 text-sm">
-            <Section
-              title="Consensus"
-              color="text-emerald-400"
-              items={synthesis.consensus}
-            />
-            <Section
-              title="Tensions"
-              color="text-amber-400"
-              items={synthesis.tensions}
-            />
-            <Section
-              title="Key risks"
-              color="text-rose-400"
-              items={synthesis.risks}
-            />
-            <Section
-              title="Next steps"
-              color="text-sky-400"
-              items={synthesis.nextSteps}
-            />
+          <div className="grid sm:grid-cols-2 gap-4 mt-4">
+            <SynthList title="Consensus" color="#0E9E6E" items={synthesis.consensus} />
+            <SynthList title="Tensions" color="#FF9F1C" items={synthesis.tensions} />
+            <SynthList title="Key risks" color="#FF4D9D" items={synthesis.risks} />
+            <SynthList title="Next steps" color="#2E7BFF" items={synthesis.nextSteps} />
           </div>
         </div>
       )}
@@ -373,7 +627,66 @@ export default function CouncilApp() {
   );
 }
 
-function Section({
+function StepHeader({
+  n,
+  color,
+  label,
+  inline,
+}: {
+  n: string;
+  color: string;
+  label: string;
+  inline?: boolean;
+}) {
+  return (
+    <div className="flex items-center gap-3" style={inline ? {} : { marginTop: 0 }}>
+      <span
+        className="grid place-items-center"
+        style={{
+          width: 26,
+          height: 26,
+          borderRadius: 8,
+          background: color,
+          color: "#fff",
+          fontWeight: 800,
+          fontSize: 14,
+        }}
+      >
+        {n}
+      </span>
+      <span
+        className="font-display"
+        style={{ fontSize: 18, letterSpacing: 1.2 }}
+      >
+        {label}
+      </span>
+    </div>
+  );
+}
+
+function FieldLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <label
+      className="block"
+      style={{ fontWeight: 700, fontSize: 15, color: "#3A3A48", margin: "16px 0 6px" }}
+    >
+      {children}
+    </label>
+  );
+}
+
+function fieldStyle(active: boolean): React.CSSProperties {
+  return {
+    background: "#F6F7FB",
+    border: active ? "1.5px solid #6C5CFF" : "1.5px solid rgba(20,20,28,.1)",
+    borderRadius: 14,
+    padding: "12px 14px",
+    fontSize: 16,
+    color: "#14141C",
+  };
+}
+
+function SynthList({
   title,
   color,
   items,
@@ -385,8 +698,14 @@ function Section({
   if (!items || items.length === 0) return null;
   return (
     <div>
-      <div className={`text-xs font-semibold mb-1 ${color}`}>{title}</div>
-      <ul dir="auto" className="list-disc list-inside text-slate-300 space-y-1">
+      <div style={{ fontSize: 12, fontWeight: 700, color, marginBottom: 4 }}>
+        {title}
+      </div>
+      <ul
+        dir="auto"
+        className="list-disc list-inside space-y-1"
+        style={{ fontSize: 14, color: "#3A3A48" }}
+      >
         {items.map((x, i) => (
           <li key={i}>{x}</li>
         ))}

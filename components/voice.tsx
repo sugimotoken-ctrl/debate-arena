@@ -2,6 +2,24 @@
 
 import { useRef, useState } from "react";
 
+function MicIcon() {
+  return (
+    <svg
+      width="22"
+      height="22"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <rect x="9" y="3" width="6" height="11" rx="3" />
+      <path d="M6 11a6 6 0 0 0 12 0M12 17v4M9 21h6" />
+    </svg>
+  );
+}
+
 /** Record from the mic, transcribe via OpenAI, and hand back the text. */
 export function MicButton({
   onText,
@@ -54,7 +72,7 @@ export function MicButton({
       recRef.current = mr;
       setRecording(true);
     } catch {
-      setErr("Microphone access denied");
+      setErr("Mic access denied");
     }
   }
 
@@ -64,33 +82,51 @@ export function MicButton({
   }
 
   return (
-    <span className="inline-flex items-center gap-1">
+    <div className="flex flex-col items-center">
       <button
         type="button"
         onClick={recording ? stop : start}
         disabled={busy}
         title={recording ? "Stop & transcribe" : title}
-        className={`shrink-0 rounded-lg px-2.5 py-2 text-sm border transition ${
-          recording
-            ? "bg-rose-500/20 border-rose-500 text-rose-300 animate-pulse"
-            : "bg-slate-800 border-slate-700 text-slate-300 hover:border-slate-500"
-        }`}
+        className="grid place-items-center transition shrink-0"
+        style={{
+          width: 56,
+          height: 56,
+          borderRadius: 14,
+          border: recording
+            ? "1.5px solid #FF6B4A"
+            : "1.5px solid rgba(108,92,255,.3)",
+          background: recording ? "#FFF1EC" : "#F2F1FF",
+          color: recording ? "#FF6B4A" : "#6C5CFF",
+        }}
+        onMouseEnter={(e) => {
+          if (!recording) {
+            e.currentTarget.style.background = "#6C5CFF";
+            e.currentTarget.style.color = "#fff";
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (!recording) {
+            e.currentTarget.style.background = "#F2F1FF";
+            e.currentTarget.style.color = "#6C5CFF";
+          }
+        }}
       >
-        {busy ? "…" : recording ? "⏹" : "🎤"}
+        {busy ? (
+          <span className="text-sm">…</span>
+        ) : recording ? (
+          <span className="w-3 h-3 rounded-[3px] bg-current animate-pulse" />
+        ) : (
+          <MicIcon />
+        )}
       </button>
-      {err && <span className="text-xs text-rose-400">{err}</span>}
-    </span>
+      {err && <span className="text-[11px] text-coral mt-1">{err}</span>}
+    </div>
   );
 }
 
 /** Speak text aloud via OpenAI TTS. */
-export function PlayButton({
-  text,
-  className,
-}: {
-  text: string;
-  className?: string;
-}) {
+export function PlayButton({ text }: { text: string }) {
   const [loading, setLoading] = useState(false);
   const [playing, setPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -120,7 +156,7 @@ export function PlayButton({
       await a.play();
       setPlaying(true);
     } catch {
-      // ignore — button just resets
+      // ignore — button resets
     } finally {
       setLoading(false);
     }
@@ -131,10 +167,15 @@ export function PlayButton({
       type="button"
       onClick={toggle}
       title={playing ? "Stop" : "Listen"}
-      className={
-        className ||
-        "shrink-0 rounded-full w-7 h-7 grid place-items-center text-xs bg-slate-800 border border-slate-700 text-slate-300 hover:border-slate-500"
-      }
+      className="shrink-0 grid place-items-center rounded-full transition"
+      style={{
+        width: 30,
+        height: 30,
+        border: "1.5px solid rgba(108,92,255,.3)",
+        background: playing ? "#6C5CFF" : "#F2F1FF",
+        color: playing ? "#fff" : "#6C5CFF",
+        fontSize: 12,
+      }}
     >
       {loading ? "…" : playing ? "⏸" : "▶"}
     </button>

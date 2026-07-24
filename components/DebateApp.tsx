@@ -20,23 +20,27 @@ import type {
 
 const EXAMPLES = [
   {
-    topic: "Should AI development be paused?",
+    topic: "Remote work is better for society",
+    stanceA: "Remote work is better for society.",
+    stanceB: "Office work is better for society.",
+  },
+  {
+    topic: "AI development should be paused until safety is solved",
     stanceA: "AI development should be paused until safety is solved.",
     stanceB: "AI development should continue without a pause.",
   },
   {
-    topic: "Remote work vs office work",
-    stanceA: "Companies are more productive fully remote.",
-    stanceB: "Companies are more productive working from an office.",
-  },
-  {
-    topic: "Is a four-day work week better?",
+    topic: "A four-day work week should be the default",
     stanceA: "A four-day work week improves outcomes for everyone.",
     stanceB: "A five-day work week remains the better default.",
   },
 ];
 
-export default function DebateApp() {
+export default function DebateApp({
+  onSwitchToCouncil,
+}: {
+  onSwitchToCouncil?: () => void;
+}) {
   const [topic, setTopic] = useState("");
   const [stanceA, setStanceA] = useState("");
   const [stanceB, setStanceB] = useState("");
@@ -74,7 +78,7 @@ export default function DebateApp() {
 
   async function run() {
     if (!config.topic || !config.stanceA || !config.stanceB) {
-      setError("Please fill in a topic and both stances.");
+      setError("Fill in the motion and both positions.");
       return;
     }
     setError(null);
@@ -131,7 +135,6 @@ export default function DebateApp() {
 
       setVerdict(finalVerdict);
 
-      // Final summary
       const sumRes = await fetch("/api/debate/summary", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -141,7 +144,6 @@ export default function DebateApp() {
       const finalSummary: FinalSummary | null = sumData.summary ?? null;
       setSummary(finalSummary);
 
-      // Auto-save for a shareable link
       const saveRes = await fetch("/api/debate/save", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -160,7 +162,6 @@ export default function DebateApp() {
       const saveData = await saveRes.json().catch(() => ({}));
       if (saveData.id) setShareId(saveData.id);
 
-      // Record the full debate in per-browser history.
       const localId: string =
         saveData.id ||
         (typeof crypto !== "undefined" && crypto.randomUUID
@@ -192,85 +193,167 @@ export default function DebateApp() {
   }
 
   return (
-    <>
-    <div className="max-w-4xl mx-auto px-4 py-8 space-y-8">
-      <header className="text-center space-y-2">
-        <h1 className="text-3xl font-bold text-white">⚖️ Debate Arena</h1>
-        <p className="text-slate-400 text-sm">
-          <span className="text-claude font-medium">Claude Opus 4.8</span> vs{" "}
-          <span className="text-gpt font-medium">GPT-5.5 Thinking</span> — a
-          neutral moderator scores agreement and writes the verdict.
+    <div className="mx-auto px-10 pb-20" style={{ maxWidth: 1000 }}>
+      {/* Hero */}
+      <div className="text-center">
+        <span
+          className="inline-block rounded-full"
+          style={{
+            background: "#fff",
+            border: "1px solid rgba(255,107,74,.35)",
+            color: "#FF6B4A",
+            fontWeight: 700,
+            fontSize: 13,
+            letterSpacing: 2.5,
+            padding: "6px 14px",
+          }}
+        >
+          TWO MODELS · HEAD TO HEAD
+        </span>
+        <h1
+          className="font-display uppercase mx-auto mt-4"
+          style={{
+            fontSize: "clamp(48px,8vw,104px)",
+            lineHeight: 0.92,
+            background: "linear-gradient(92deg,#FF6B4A,#FF9F1C 45%,#6C5CFF)",
+            WebkitBackgroundClip: "text",
+            backgroundClip: "text",
+            color: "transparent",
+          }}
+        >
+          The Debate.
+        </h1>
+        <p
+          className="mx-auto mt-3"
+          style={{ maxWidth: 560, fontSize: 18, color: "#5C5C6E", lineHeight: 1.55 }}
+        >
+          Two models take opposite sides of your motion and argue it out, round
+          by round, while a neutral moderator scores the exchange.
         </p>
-      </header>
+      </div>
 
-      <div className="rounded-xl border border-slate-700 bg-slate-900/50 p-5 space-y-4">
-        <div className="flex flex-wrap gap-2">
-          <span className="text-xs text-slate-500 self-center">Try:</span>
-          {EXAMPLES.map((e, i) => (
-            <button
-              key={i}
-              onClick={() => loadExample(i)}
-              className="text-xs px-2.5 py-1 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300"
-            >
-              {e.topic}
-            </button>
-          ))}
+      {/* Example chips */}
+      <div className="flex flex-wrap gap-2 justify-center mt-5">
+        {EXAMPLES.map((e, i) => (
+          <button
+            key={i}
+            onClick={() => loadExample(i)}
+            className="rounded-full"
+            style={{
+              padding: "5px 12px",
+              fontSize: 12.5,
+              background: "#fff",
+              border: "1px solid rgba(20,20,28,.1)",
+              color: "#6B6B7B",
+            }}
+          >
+            {e.topic}
+          </button>
+        ))}
+      </div>
+
+      {/* Debater cards */}
+      <div
+        className="grid items-stretch gap-4 mt-6"
+        style={{ gridTemplateColumns: "1fr auto 1fr" }}
+      >
+        <DebaterCard
+          color="#FF6B4A"
+          tint="#FFF1EC"
+          stancePill="👍 SIDE A · FOR"
+          model="Claude Opus 4.8"
+          org="Anthropic"
+          emoji="⚖️"
+          stance={stanceA}
+          onStance={setStanceA}
+          placeholder="The position Claude argues for"
+        />
+        <div className="self-center grid place-items-center relative" style={{ width: 82, height: 82 }}>
+          <div
+            className="absolute inset-0 rounded-full"
+            style={{
+              background: "conic-gradient(from 0deg,#FF6B4A,#FF9F1C,#6C5CFF,#FF6B4A)",
+              animation: "spin360 8s linear infinite",
+            }}
+          />
+          <div
+            className="absolute grid place-items-center rounded-full font-display"
+            style={{ inset: 4, background: "#fff", fontSize: 30 }}
+          >
+            VS
+          </div>
         </div>
+        <DebaterCard
+          color="#6C5CFF"
+          tint="#F1EFFF"
+          stancePill="👎 SIDE B · AGAINST"
+          model="GPT-5.5 Thinking"
+          org="OpenAI"
+          emoji="🤖"
+          stance={stanceB}
+          onStance={setStanceB}
+          placeholder="The opposing position GPT argues for"
+        />
+      </div>
 
-        <div>
-          <label className="block text-sm text-slate-300 mb-1">Topic</label>
+      {/* Motion card */}
+      <div
+        className="bg-white mt-5"
+        style={{
+          border: "1px solid rgba(20,20,28,.08)",
+          borderRadius: 24,
+          padding: 30,
+          boxShadow: "0 24px 60px rgba(20,20,28,.10)",
+        }}
+      >
+        <div style={{ fontWeight: 700, fontSize: 13, color: "#6B6B7B", letterSpacing: 0.5 }}>
+          THE MOTION
+        </div>
+        <div className="flex gap-3 mt-2">
           <input
             value={topic}
             onChange={(e) => setTopic(e.target.value)}
-            placeholder="e.g. Should social media have age limits?"
-            className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-slate-500"
+            placeholder="e.g. This house believes remote work is better for society"
+            className="flex-1 outline-none"
+            style={{
+              background: "#F6F7FB",
+              border: "1.5px solid rgba(20,20,28,.1)",
+              borderRadius: 14,
+              padding: "12px 14px",
+              fontSize: 16,
+            }}
           />
+          <button
+            onClick={run}
+            disabled={running}
+            className="debate-fill font-display disabled:opacity-60"
+            style={{
+              fontSize: 17,
+              letterSpacing: 1,
+              color: "#fff",
+              borderRadius: 14,
+              padding: "0 26px",
+            }}
+          >
+            {running ? "…" : "START →"}
+          </button>
         </div>
 
-        <div className="grid sm:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm text-claude mb-1">
-              Side A — Claude defends
-            </label>
-            <textarea
-              value={stanceA}
-              onChange={(e) => setStanceA(e.target.value)}
-              rows={2}
-              placeholder="The position Claude argues for"
-              className="w-full rounded-lg bg-slate-800 border border-claude/30 px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-claude"
-            />
-          </div>
-          <div>
-            <label className="block text-sm text-gpt mb-1">
-              Side B — GPT defends
-            </label>
-            <textarea
-              value={stanceB}
-              onChange={(e) => setStanceB(e.target.value)}
-              rows={2}
-              placeholder="The opposing position GPT argues for"
-              className="w-full rounded-lg bg-slate-800 border border-gpt/30 px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-gpt"
-            />
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-end gap-4">
-          <div>
-            <label className="block text-xs text-slate-400 mb-1">
-              Max rounds: {maxRounds}
-            </label>
+        {/* Controls */}
+        <div className="flex flex-wrap items-center gap-6 mt-4">
+          <label style={{ fontSize: 13, color: "#6B6B7B" }}>
+            Rounds: <b style={{ color: "#14141C" }}>{maxRounds}</b>
             <input
               type="range"
               min={2}
               max={8}
               value={maxRounds}
               onChange={(e) => setMaxRounds(Number(e.target.value))}
+              className="ml-2 align-middle"
             />
-          </div>
-          <div>
-            <label className="block text-xs text-slate-400 mb-1">
-              Agreement threshold: {threshold}%
-            </label>
+          </label>
+          <label style={{ fontSize: 13, color: "#6B6B7B" }}>
+            Agreement threshold: <b style={{ color: "#14141C" }}>{threshold}%</b>
             <input
               type="range"
               min={50}
@@ -278,57 +361,140 @@ export default function DebateApp() {
               step={5}
               value={threshold}
               onChange={(e) => setThreshold(Number(e.target.value))}
+              className="ml-2 align-middle"
             />
-          </div>
-          <div className="ml-auto flex gap-2">
+          </label>
+          {started && !running && (
             <button
-              onClick={run}
-              disabled={running}
-              className="px-5 py-2 rounded-lg bg-white text-slate-900 font-semibold text-sm hover:bg-slate-200 disabled:opacity-50"
+              onClick={swapAndRerun}
+              className="rounded-lg"
+              style={{
+                padding: "7px 14px",
+                fontSize: 13,
+                background: "#F6F7FB",
+                border: "1px solid rgba(20,20,28,.1)",
+                color: "#3A3A48",
+              }}
             >
-              {running ? "Debating…" : "Start debate"}
+              ⇄ Swap &amp; rematch
             </button>
-            {started && !running && (
-              <button
-                onClick={swapAndRerun}
-                title="Swap sides and run again to test model bias"
-                className="px-4 py-2 rounded-lg bg-slate-800 text-slate-200 text-sm hover:bg-slate-700"
-              >
-                ⇄ Swap & rematch
-              </button>
-            )}
-          </div>
+          )}
         </div>
 
-        {error && <p className="text-rose-400 text-sm">{error}</p>}
+        {error && <p style={{ color: "#FF6B4A", fontSize: 14, marginTop: 10 }}>{error}</p>}
         {shareId && (
-          <p className="text-sm text-emerald-400">
+          <p style={{ fontSize: 14, marginTop: 10, color: "#0E9E6E" }}>
             Saved ·{" "}
             <a className="underline" href={`/debate/${shareId}`}>
               shareable link
             </a>
           </p>
         )}
+        <p style={{ fontSize: 13.5, color: "#9A9AAC", marginTop: 12 }}>
+          Need a full board instead of a duel?{" "}
+          <button
+            onClick={onSwitchToCouncil}
+            className="underline"
+            style={{ color: "#6C5CFF", fontWeight: 600 }}
+          >
+            Switch to the 🏛️ Council
+          </button>
+          .
+        </p>
       </div>
 
       {started && (
-        <DebateBoard
-          config={config}
-          turns={turns}
-          moderations={moderations}
-          summary={summary}
-          verdict={verdict}
-          running={running}
-          mock={mock}
-        />
+        <div className="mt-8">
+          <DebateBoard
+            config={config}
+            turns={turns}
+            moderations={moderations}
+            summary={summary}
+            verdict={verdict}
+            running={running}
+            mock={mock}
+          />
+        </div>
       )}
-    </div>
 
-    <DebateHistory
-      items={history}
-      onDelete={(id) => setHistory(removeFromHistory(id))}
-      onClear={() => setHistory(clearHistory())}
-    />
-    </>
+      <div className="mt-8">
+        <DebateHistory
+          items={history}
+          onDelete={(id) => setHistory(removeFromHistory(id))}
+          onClear={() => setHistory(clearHistory())}
+        />
+      </div>
+    </div>
+  );
+}
+
+function DebaterCard({
+  color,
+  tint,
+  stancePill,
+  model,
+  org,
+  emoji,
+  stance,
+  onStance,
+  placeholder,
+}: {
+  color: string;
+  tint: string;
+  stancePill: string;
+  model: string;
+  org: string;
+  emoji: string;
+  stance: string;
+  onStance: (v: string) => void;
+  placeholder: string;
+}) {
+  return (
+    <div
+      className="bg-white flex flex-col gap-3"
+      style={{
+        border: `1px solid ${color}4d`,
+        borderRadius: 24,
+        padding: 20,
+        boxShadow: `0 18px 40px ${color}1f`,
+      }}
+    >
+      <div
+        className="grid place-items-center"
+        style={{ height: 130, borderRadius: 16, background: tint }}
+      >
+        <div style={{ fontSize: 46 }}>{emoji}</div>
+      </div>
+      <span
+        className="self-start rounded-full"
+        style={{
+          background: tint,
+          color,
+          fontWeight: 800,
+          fontSize: 12,
+          letterSpacing: 1,
+          padding: "5px 12px",
+        }}
+      >
+        {stancePill}
+      </span>
+      <div style={{ fontWeight: 700, fontSize: 20, color: "#14141C" }}>{model}</div>
+      <div style={{ fontSize: 14, color: "#8A8A9A", marginTop: -8 }}>{org}</div>
+      <textarea
+        value={stance}
+        onChange={(e) => onStance(e.target.value)}
+        placeholder={placeholder}
+        rows={3}
+        className="outline-none resize-y"
+        style={{
+          background: "#F6F7FB",
+          border: "1.5px solid rgba(20,20,28,.1)",
+          borderRadius: 14,
+          padding: "10px 12px",
+          fontSize: 14,
+          color: "#14141C",
+        }}
+      />
+    </div>
   );
 }

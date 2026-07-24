@@ -11,10 +11,10 @@ const VERDICT_TEXT: Record<Verdict, string> = {
   timeout: "Partial",
 };
 const VERDICT_COLOR: Record<Verdict, string> = {
-  ongoing: "text-slate-400",
-  converged: "text-emerald-400",
-  impasse: "text-rose-400",
-  timeout: "text-amber-400",
+  ongoing: "#8A8A9A",
+  converged: "#0E9E6E",
+  impasse: "#FF4D9D",
+  timeout: "#FF9F1C",
 };
 
 export default function DebateHistory({
@@ -31,17 +31,16 @@ export default function DebateHistory({
   if (items.length === 0) return null;
 
   return (
-    <section className="max-w-4xl mx-auto px-4 pb-16 space-y-3">
-      <div className="flex items-center justify-between border-t border-slate-800 pt-6">
-        <h2 className="text-lg font-semibold text-white">
-          History{" "}
-          <span className="text-slate-500 text-sm font-normal">
-            ({items.length})
-          </span>
+    <section className="space-y-3" style={{ borderTop: "1px solid rgba(20,20,28,.1)", paddingTop: 24 }}>
+      <div className="flex items-center justify-between">
+        <h2 className="font-display" style={{ fontSize: 22 }}>
+          HISTORY{" "}
+          <span style={{ color: "#9A9AAC", fontSize: 14 }}>({items.length})</span>
         </h2>
         <button
           onClick={onClear}
-          className="text-xs text-slate-500 hover:text-rose-400"
+          style={{ fontSize: 12, color: "#9A9AAC" }}
+          className="hover:underline"
         >
           Clear all
         </button>
@@ -56,40 +55,36 @@ export default function DebateHistory({
           return (
             <div
               key={d.id}
-              className="rounded-lg border border-slate-800 bg-slate-900/40"
+              className="bg-white"
+              style={{ border: "1px solid rgba(20,20,28,.08)", borderRadius: 14 }}
             >
               <button
                 onClick={() => setOpenId(open ? null : d.id)}
-                className="w-full flex items-center gap-3 p-3 text-left hover:bg-slate-900/60"
+                className="w-full flex items-center gap-3 p-3 text-left"
               >
-                <span className="text-slate-500 text-xs w-3">
+                <span style={{ color: "#9A9AAC", fontSize: 12, width: 12 }}>
                   {open ? "▾" : "▸"}
                 </span>
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm text-white truncate">
+                  <div className="truncate" style={{ fontSize: 14, color: "#14141C" }}>
                     {d.config.topic}
                   </div>
-                  <div className="text-xs text-slate-500">
+                  <div style={{ fontSize: 12, color: "#9A9AAC" }}>
                     {new Date(d.createdAt).toLocaleString()} · {d.turns.length}{" "}
                     turns · {score}% agreement
                     {d.mock ? " · mock" : ""}
                   </div>
                 </div>
-                <span
-                  className={`text-xs font-medium ${VERDICT_COLOR[d.verdict]}`}
-                >
+                <span style={{ fontSize: 12, fontWeight: 600, color: VERDICT_COLOR[d.verdict] }}>
                   {VERDICT_TEXT[d.verdict]}
                 </span>
               </button>
 
               {open && (
-                <div className="p-3 border-t border-slate-800 space-y-3">
-                  <div className="flex items-center gap-4 text-xs">
+                <div className="p-3 space-y-3" style={{ borderTop: "1px solid rgba(20,20,28,.08)" }}>
+                  <div className="flex items-center gap-4" style={{ fontSize: 12 }}>
                     {d.shared && (
-                      <a
-                        href={`/debate/${d.id}`}
-                        className="underline text-emerald-400"
-                      >
+                      <a href={`/debate/${d.id}`} className="underline" style={{ color: "#0E9E6E" }}>
                         Open shareable link →
                       </a>
                     )}
@@ -98,7 +93,8 @@ export default function DebateHistory({
                         if (openId === d.id) setOpenId(null);
                         onDelete(d.id);
                       }}
-                      className="text-slate-500 hover:text-rose-400 ml-auto"
+                      className="ml-auto hover:underline"
+                      style={{ color: "#9A9AAC" }}
                     >
                       Delete
                     </button>
