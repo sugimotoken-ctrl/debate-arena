@@ -64,6 +64,7 @@ export async function adviseOne(
   topic: string,
   context: string,
   language: Lang = "auto",
+  history: string = "",
 ): Promise<Advice> {
   if (!hasGpt()) return mockAdvice(adviser, topic);
 
@@ -72,13 +73,19 @@ export async function adviseOne(
     "You are one of several advisers in a boardroom advising on a decision.",
     `Speak ONLY from your perspective as ${adviser.name} (${adviser.role}).`,
     "Be concise and specific — at most ~140 words for the body. No preamble.",
+    history
+      ? "This is an ongoing meeting. Build on the discussion so far; respond to the latest question and don't repeat points already made."
+      : "",
     langInstruction(language),
     'Respond ONLY with JSON: {"body": string, "bottomLine": string}. "bottomLine" is your single-sentence crisp recommendation.',
-  ].join("\n");
+  ]
+    .filter(Boolean)
+    .join("\n");
 
   const input = [
     `TOPIC / DECISION: ${topic}`,
     context ? `CONTEXT: ${context}` : "",
+    history ? `\nDISCUSSION SO FAR:\n${history}` : "",
     "",
     "Give your advice.",
   ]
@@ -118,6 +125,7 @@ export async function synthesize(
   context: string,
   advices: Advice[],
   language: Lang = "auto",
+  history: string = "",
 ): Promise<CouncilSynthesis> {
   if (!hasGpt()) return mockSynthesis(advices);
 
@@ -142,8 +150,9 @@ export async function synthesize(
   const input = [
     `TOPIC / DECISION: ${topic}`,
     context ? `CONTEXT: ${context}` : "",
+    history ? `\nEARLIER DISCUSSION:\n${history}` : "",
     "",
-    "ADVISER INPUT:",
+    "LATEST ADVISER INPUT:",
     panel,
   ]
     .filter(Boolean)

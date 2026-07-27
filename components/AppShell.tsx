@@ -30,13 +30,26 @@ export default function AppShell() {
         ))}
       </div>
 
-      <nav className="flex justify-center gap-3 py-[22px]">
+      <nav className="relative flex justify-center items-center gap-3 py-[22px]">
         <Pill active={tab === "debate"} kind="debate" onClick={() => setTab("debate")}>
           ⚖️ Debate
         </Pill>
         <Pill active={tab === "council"} kind="council" onClick={() => setTab("council")}>
           🏛️ Council
         </Pill>
+        <a
+          href="/rooms"
+          className="absolute right-6 rounded-full font-bold text-sm transition"
+          style={{
+            padding: "9px 18px",
+            background: "#fff",
+            color: "#6C5CFF",
+            border: "1.5px solid rgba(108,92,255,.3)",
+            boxShadow: "0 4px 14px rgba(20,20,28,.06)",
+          }}
+        >
+          🏛️ Meeting Rooms →
+        </a>
       </nav>
 
       {tab === "council" ? (
