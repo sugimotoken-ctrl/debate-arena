@@ -71,6 +71,7 @@ export default function RoomView({
   const [draft, setDraft] = useState("");
   const [question, setQuestion] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
+  const pendingRef = useRef<number>(0);
 
   const [inviteQ, setInviteQ] = useState("");
   const [inviteBusy, setInviteBusy] = useState(false);
@@ -142,6 +143,36 @@ export default function RoomView({
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length]);
 
+  // Safety net: poll for new messages. Realtime can miss events and the long
+  // convene/ask request may outlive its connection — polling guarantees the
+  // thread fills in and the "thinking…" spinner clears when the Chair posts.
+  useEffect(() => {
+    const sb = supabaseBrowser();
+    const iv = setInterval(async () => {
+      const { data } = await sb
+        .from("messages")
+        .select(
+          "id,author_type,author_id,author_name,kind,body,bottom_line,meta,created_at",
+        )
+        .eq("room_id", room.id)
+        .order("created_at", { ascending: true });
+      if (!data) return;
+      setMessages(data as Msg[]);
+      if (pendingRef.current) {
+        const done = data.some(
+          (m: any) =>
+            m.kind === "synthesis" &&
+            new Date(m.created_at).getTime() > pendingRef.current - 2000,
+        );
+        if (done) {
+          pendingRef.current = 0;
+          setBusy(null);
+        }
+      }
+    }, 3000);
+    return () => clearInterval(iv);
+  }, [room.id]);
+
   function toggle(id: string) {
     setSelected((prev) => {
       const next = new Set(prev);
@@ -157,6 +188,7 @@ export default function RoomView({
     setError(null);
     setBusy("convene");
     setConvened(true);
+    pendingRef.current = Date.now();
     try {
       const r = await fetch(`/api/rooms/${room.id}/convene`, {
         method: "POST",
@@ -190,6 +222,7 @@ export default function RoomView({
   async function ask() {
     if (!question.trim()) return;
     setBusy("ask");
+    pendingRef.current = Date.now();
     const q = question;
     setQuestion("");
     try {
