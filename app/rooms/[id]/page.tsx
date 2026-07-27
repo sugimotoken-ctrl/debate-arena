@@ -37,7 +37,11 @@ export default async function RoomPage({
       <RoomView
         room={room as any}
         initialMessages={(messages as any[]) ?? []}
-        me={{ id: profile.id, name: profile.full_name || profile.email }}
+        me={{
+          id: profile.id,
+          name: profile.full_name || profile.email,
+          role: profile.role,
+        }}
       />
     </>
   );

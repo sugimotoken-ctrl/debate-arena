@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { ADVISERS } from "@/lib/advisers-data";
 import { supabaseBrowser } from "@/lib/supabase/client";
 import { MicButton, PlayButton } from "./voice";
@@ -26,6 +27,7 @@ interface Room {
   language: Lang;
   adviser_ids: string[];
   convened: boolean;
+  owner_id: string;
 }
 
 const LANGS: { id: Lang; label: string }[] = [
@@ -41,12 +43,16 @@ export default function RoomView({
 }: {
   room: Room;
   initialMessages: Msg[];
-  me: { id: string; name: string };
+  me: { id: string; name: string; role: string };
 }) {
+  const router = useRouter();
+  const canManage = me.role === "admin" || room.owner_id === me.id;
+
   const [messages, setMessages] = useState<Msg[]>(initialMessages);
   const [convened, setConvened] = useState(room.convened);
+  const [name, setName] = useState(room.name);
+  const [renaming, setRenaming] = useState(false);
 
-  // setup state
   const [topic, setTopic] = useState(room.topic || "");
   const [context, setContext] = useState(room.context || "");
   const [language, setLanguage] = useState<Lang>(room.language || "auto");
@@ -64,24 +70,34 @@ export default function RoomView({
   const [question, setQuestion] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
 
-  // Live updates: append any message inserted into this room.
   useEffect(() => {
     const sb = supabaseBrowser();
     const ch = sb
       .channel(`room-${room.id}`)
       .on(
         "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "messages",
-          filter: `room_id=eq.${room.id}`,
-        },
+        { event: "INSERT", schema: "public", table: "messages", filter: `room_id=eq.${room.id}` },
         (payload) => {
           const m = payload.new as Msg;
           setMessages((prev) =>
             prev.some((x) => x.id === m.id) ? prev : [...prev, m],
           );
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "messages", filter: `room_id=eq.${room.id}` },
+        (payload) => {
+          const m = payload.new as Msg;
+          setMessages((prev) => prev.map((x) => (x.id === m.id ? { ...x, ...m } : x)));
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "messages", filter: `room_id=eq.${room.id}` },
+        (payload) => {
+          const oldId = (payload.old as any)?.id;
+          if (oldId) setMessages((prev) => prev.filter((x) => x.id !== oldId));
         },
       )
       .subscribe();
@@ -112,12 +128,7 @@ export default function RoomView({
       const r = await fetch(`/api/rooms/${room.id}/convene`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          topic,
-          context,
-          adviserIds: [...selected],
-          language,
-        }),
+        body: JSON.stringify({ topic, context, adviserIds: [...selected], language }),
       });
       const j = await r.json();
       if (j.error) throw new Error(j.error);
@@ -163,14 +174,80 @@ export default function RoomView({
     }
   }
 
+  async function saveName() {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    setRenaming(false);
+    await fetch(`/api/rooms/${room.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: trimmed }),
+    });
+  }
+
+  async function deleteRoom() {
+    if (!confirm("Delete this whole meeting room? This cannot be undone.")) return;
+    await fetch(`/api/rooms/${room.id}`, { method: "DELETE" });
+    router.push("/rooms");
+    router.refresh();
+  }
+
+  async function editMsg(id: string, body: string) {
+    setMessages((prev) => prev.map((x) => (x.id === id ? { ...x, body } : x)));
+    await fetch(`/api/rooms/${room.id}/message/${id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ body }),
+    });
+  }
+
+  async function deleteMsg(id: string) {
+    setMessages((prev) => prev.filter((x) => x.id !== id));
+    await fetch(`/api/rooms/${room.id}/message/${id}`, { method: "DELETE" });
+  }
+
   return (
     <div className="mx-auto px-6 py-6" style={{ maxWidth: 820 }}>
-      <h1 className="font-display" style={{ fontSize: 30, color: "#14141C" }}>
-        {room.name}
-      </h1>
+      <div className="flex items-center gap-2">
+        {renaming ? (
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && saveName()}
+            onBlur={saveName}
+            autoFocus
+            className="font-display"
+            style={{
+              fontSize: 28,
+              color: "#14141C",
+              border: "1.5px solid #6C5CFF",
+              borderRadius: 10,
+              padding: "2px 8px",
+              outline: "none",
+            }}
+          />
+        ) : (
+          <h1 className="font-display" style={{ fontSize: 30, color: "#14141C" }}>
+            {name}
+          </h1>
+        )}
+        {canManage && !renaming && (
+          <div className="flex gap-2 ml-2">
+            <button
+              onClick={() => setRenaming(true)}
+              title="Rename"
+              style={iconBtn}
+            >
+              ✏️
+            </button>
+            <button onClick={deleteRoom} title="Delete room" style={iconBtn}>
+              🗑️
+            </button>
+          </div>
+        )}
+      </div>
 
       {!convened ? (
-        /* ---------- SETUP ---------- */
         <div
           className="bg-white mt-4 space-y-4"
           style={{
@@ -298,9 +375,8 @@ export default function RoomView({
           </button>
         </div>
       ) : (
-        /* ---------- THREAD ---------- */
         <>
-          {room.topic && (
+          {(topic || room.topic) && (
             <p className="mt-1" style={{ color: "#5C5C6E", fontSize: 15 }} dir="auto">
               {topic || room.topic}
             </p>
@@ -308,7 +384,14 @@ export default function RoomView({
 
           <div className="mt-5 space-y-3">
             {messages.map((m) => (
-              <MessageCard key={m.id} m={m} mine={m.author_id === me.id} />
+              <MessageCard
+                key={m.id}
+                m={m}
+                mine={m.author_id === me.id}
+                isAdmin={me.role === "admin"}
+                onEdit={editMsg}
+                onDelete={deleteMsg}
+              />
             ))}
             {busy && (
               <div
@@ -329,7 +412,6 @@ export default function RoomView({
             </p>
           )}
 
-          {/* Ask the council */}
           <div
             className="bg-white mt-6 space-y-2"
             style={{
@@ -371,7 +453,6 @@ export default function RoomView({
             </div>
           </div>
 
-          {/* Post a message */}
           <div className="flex gap-2 mt-3">
             <input
               value={draft}
@@ -421,8 +502,30 @@ const fieldStyle: React.CSSProperties = {
   color: "#14141C",
   outline: "none",
 };
+const iconBtn: React.CSSProperties = {
+  fontSize: 15,
+  background: "#F6F7FB",
+  borderRadius: 8,
+  padding: "4px 8px",
+  lineHeight: 1,
+};
 
-function MessageCard({ m, mine }: { m: Msg; mine: boolean }) {
+function MessageCard({
+  m,
+  mine,
+  isAdmin,
+  onEdit,
+  onDelete,
+}: {
+  m: Msg;
+  mine: boolean;
+  isAdmin: boolean;
+  onEdit: (id: string, body: string) => void;
+  onDelete: (id: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState(m.body);
+
   if (m.kind === "advice") {
     const color = m.meta?.color || "#6C5CFF";
     return (
@@ -438,9 +541,7 @@ function MessageCard({ m, mine }: { m: Msg; mine: boolean }) {
         <div className="flex items-center gap-2 mb-2">
           <span style={{ fontSize: 20 }}>{m.meta?.emoji}</span>
           <b style={{ color: "#14141C", fontSize: 14 }}>{m.author_name}</b>
-          <span style={{ fontSize: 12, color: "#8A8A9A" }}>
-            · {m.meta?.role}
-          </span>
+          <span style={{ fontSize: 12, color: "#8A8A9A" }}>· {m.meta?.role}</span>
           <span className="ml-auto">
             <PlayButton text={`${m.body}. ${m.bottom_line}`} />
           </span>
@@ -484,14 +585,7 @@ function MessageCard({ m, mine }: { m: Msg; mine: boolean }) {
             <PlayButton text={`Recommendation: ${m.body}`} />
           </span>
         </div>
-        <div
-          style={{
-            background: "#F6F7FB",
-            borderRadius: 12,
-            padding: 12,
-            marginBottom: 10,
-          }}
-        >
+        <div style={{ background: "#F6F7FB", borderRadius: 12, padding: 12, marginBottom: 10 }}>
           <div style={{ fontSize: 12, color: "#8A8A9A", marginBottom: 3 }}>
             Recommendation
           </div>
@@ -524,13 +618,67 @@ function MessageCard({ m, mine }: { m: Msg; mine: boolean }) {
         padding: 12,
       }}
     >
-      <div style={{ fontSize: 12, color: "#8A8A9A", marginBottom: 2 }}>
-        {m.author_name}
-        {isQuestion && " · asked the council"}
+      <div className="flex items-center gap-2" style={{ marginBottom: 2 }}>
+        <span style={{ fontSize: 12, color: "#8A8A9A" }}>
+          {m.author_name}
+          {isQuestion && " · asked the council"}
+        </span>
+        {(mine || isAdmin) && !editing && (
+          <span className="ml-auto flex gap-2">
+            {mine && (
+              <button
+                onClick={() => {
+                  setText(m.body);
+                  setEditing(true);
+                }}
+                title="Edit"
+                style={{ fontSize: 12, color: "#6C5CFF" }}
+              >
+                Edit
+              </button>
+            )}
+            <button
+              onClick={() => onDelete(m.id)}
+              title="Delete"
+              style={{ fontSize: 12, color: "#FF4D9D" }}
+            >
+              Delete
+            </button>
+          </span>
+        )}
       </div>
-      <p dir="auto" style={{ fontSize: 14, color: "#14141C" }}>
-        {m.body}
-      </p>
+      {editing ? (
+        <div className="flex gap-2">
+          <input
+            value={text}
+            dir="auto"
+            onChange={(e) => setText(e.target.value)}
+            autoFocus
+            className="flex-1"
+            style={{ ...fieldStyle, padding: "8px 10px", fontSize: 14 }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                onEdit(m.id, text.trim());
+                setEditing(false);
+              }
+              if (e.key === "Escape") setEditing(false);
+            }}
+          />
+          <button
+            onClick={() => {
+              onEdit(m.id, text.trim());
+              setEditing(false);
+            }}
+            style={{ fontSize: 13, color: "#0E9E6E", fontWeight: 700 }}
+          >
+            Save
+          </button>
+        </div>
+      ) : (
+        <p dir="auto" style={{ fontSize: 14, color: "#14141C" }}>
+          {m.body}
+        </p>
+      )}
     </div>
   );
 }
@@ -550,11 +698,7 @@ function SynthList({
       <div style={{ color, fontSize: 12, fontWeight: 700, marginBottom: 3 }}>
         {title}
       </div>
-      <ul
-        dir="auto"
-        className="list-disc list-inside space-y-1"
-        style={{ color: "#3A3A48" }}
-      >
+      <ul dir="auto" className="list-disc list-inside space-y-1" style={{ color: "#3A3A48" }}>
         {items.map((x, i) => (
           <li key={i}>{x}</li>
         ))}

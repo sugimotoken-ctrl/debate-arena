@@ -344,14 +344,10 @@ export default function DebateApp({
           </p>
         )}
         <div className="mt-[18px]" style={{ fontSize: 14, color: "#9A9AAC" }}>
-          Need a full board instead of a duel? Switch to the{" "}
-          <button
-            onClick={onSwitchToCouncil}
-            className="font-semibold"
-            style={{ color: "#6C5CFF" }}
-          >
-            🏛️ Council
-          </button>
+          Need a full board instead of a duel? Go to{" "}
+          <a href="/rooms" className="font-semibold" style={{ color: "#6C5CFF" }}>
+            🏛️ Meeting Rooms
+          </a>
           .
         </div>
         {shareId && (

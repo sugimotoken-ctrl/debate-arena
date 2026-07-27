@@ -32,10 +32,10 @@ export default function GatedHeader({ profile }: { profile: Profile }) {
           </Link>
         )}
         <Link
-          href="/"
+          href="/debate"
           style={{ fontSize: 14, fontWeight: 600, color: "#6B6B7B" }}
         >
-          Quick tools
+          ⚖️ Debate
         </Link>
         <div className="ml-auto flex items-center gap-3">
           <span style={{ fontSize: 13, color: "#8A8A9A" }}>
