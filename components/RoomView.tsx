@@ -39,10 +39,12 @@ const LANGS: { id: Lang; label: string }[] = [
 export default function RoomView({
   room,
   initialMessages,
+  participants,
   me,
 }: {
   room: Room;
   initialMessages: Msg[];
+  participants: { name: string; isOwner: boolean }[];
   me: { id: string; name: string; role: string };
 }) {
   const router = useRouter();
@@ -69,6 +71,36 @@ export default function RoomView({
   const [draft, setDraft] = useState("");
   const [question, setQuestion] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
+
+  const [inviteQ, setInviteQ] = useState("");
+  const [inviteBusy, setInviteBusy] = useState(false);
+  const [inviteMsg, setInviteMsg] = useState<string | null>(null);
+
+  async function invite() {
+    if (!inviteQ.trim()) return;
+    setInviteBusy(true);
+    setInviteMsg(null);
+    try {
+      const r = await fetch(`/api/rooms/${room.id}/invite`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ query: inviteQ.trim() }),
+      });
+      const j = await r.json();
+      if (j.error) throw new Error(j.error);
+      setInviteMsg(
+        j.kind === "email"
+          ? `Invitation emailed to ${j.who}.`
+          : `Added ${j.who} to the meeting.`,
+      );
+      setInviteQ("");
+      router.refresh();
+    } catch (e: any) {
+      setInviteMsg(e?.message || "Invite failed.");
+    } finally {
+      setInviteBusy(false);
+    }
+  }
 
   useEffect(() => {
     const sb = supabaseBrowser();
@@ -249,6 +281,75 @@ export default function RoomView({
         )}
       </div>
       )}
+
+      {/* People + invite */}
+      <div
+        className="bg-white mt-4"
+        style={{
+          border: "1px solid rgba(20,20,28,.08)",
+          borderRadius: 16,
+          padding: 14,
+        }}
+      >
+        <div className="flex flex-wrap items-center gap-2">
+          <span style={{ fontSize: 13, fontWeight: 700, color: "#6B6B7B" }}>
+            In this meeting:
+          </span>
+          {participants.map((p, i) => (
+            <span
+              key={i}
+              className="rounded-full"
+              style={{
+                background: p.isOwner ? "#F1EFFF" : "#F6F7FB",
+                color: p.isOwner ? "#5A4BE0" : "#3A3A48",
+                fontSize: 12.5,
+                fontWeight: 600,
+                padding: "4px 10px",
+              }}
+            >
+              {p.name}
+              {p.isOwner ? " · host" : ""}
+            </span>
+          ))}
+        </div>
+        {canManage && (
+          <div className="mt-3">
+            <div className="flex gap-2">
+              <input
+                value={inviteQ}
+                onChange={(e) => setInviteQ(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && !inviteBusy && invite()}
+                placeholder="Invite by member name or email…"
+                className="flex-1"
+                style={fieldStyle}
+              />
+              <button
+                onClick={invite}
+                disabled={inviteBusy}
+                className="text-white disabled:opacity-60"
+                style={{
+                  background: "linear-gradient(92deg,#6C5CFF,#2E7BFF)",
+                  borderRadius: 12,
+                  padding: "0 18px",
+                  fontSize: 14,
+                  fontWeight: 700,
+                }}
+              >
+                {inviteBusy ? "…" : "Invite"}
+              </button>
+            </div>
+            {inviteMsg && (
+              <p className="mt-2" style={{ fontSize: 13, color: "#0E9E6E" }}>
+                {inviteMsg}
+              </p>
+            )}
+            <p className="mt-1" style={{ fontSize: 12, color: "#9A9AAC" }}>
+              Not a member yet? Enter their email and we&apos;ll email them an
+              invite to join this meeting.
+            </p>
+          </div>
+        )}
+      </div>
 
       {!convened ? (
         <div
