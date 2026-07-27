@@ -119,6 +119,7 @@ export default function RoomView({
   }
 
   async function convene() {
+    if (!name.trim()) return setError("Name the meeting.");
     if (!topic.trim()) return setError("Enter a topic.");
     if (selected.size === 0) return setError("Pick at least one adviser.");
     setError(null);
@@ -128,7 +129,7 @@ export default function RoomView({
       const r = await fetch(`/api/rooms/${room.id}/convene`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ topic, context, adviserIds: [...selected], language }),
+        body: JSON.stringify({ name, topic, context, adviserIds: [...selected], language }),
       });
       const j = await r.json();
       if (j.error) throw new Error(j.error);
@@ -208,6 +209,7 @@ export default function RoomView({
 
   return (
     <div className="mx-auto px-6 py-6" style={{ maxWidth: 820 }}>
+      {convened && (
       <div className="flex items-center gap-2">
         {renaming ? (
           <input
@@ -246,6 +248,7 @@ export default function RoomView({
           </div>
         )}
       </div>
+      )}
 
       {!convened ? (
         <div
@@ -257,6 +260,17 @@ export default function RoomView({
             boxShadow: "0 20px 50px rgba(20,20,28,.08)",
           }}
         >
+          <div>
+            <label className="block mb-1" style={labelStyle}>
+              Meeting name
+            </label>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Name this meeting — e.g. Q3 Pricing Decision"
+              style={{ ...fieldStyle, width: "100%" }}
+            />
+          </div>
           <div className="flex items-center gap-2">
             <span style={{ fontSize: 13, fontWeight: 700, color: "#6B6B7B" }}>
               Language:

@@ -16,13 +16,17 @@ export async function POST(
     return NextResponse.json({ error: "Not authorized." }, { status: 403 });
   }
   const { id } = await params;
-  const { topic, context, adviserIds, language } = (await req.json()) as {
+  const { name, topic, context, adviserIds, language } = (await req.json()) as {
+    name?: string;
     topic: string;
     context?: string;
     adviserIds: string[];
     language?: Lang;
   };
 
+  if (!name?.trim()) {
+    return NextResponse.json({ error: "Name the meeting." }, { status: 400 });
+  }
   if (!topic?.trim() || !adviserIds?.length) {
     return NextResponse.json(
       { error: "Need a topic and at least one adviser." },
@@ -35,6 +39,7 @@ export async function POST(
   await admin
     .from("rooms")
     .update({
+      name: name.trim(),
       topic: topic.trim(),
       context: (context || "").trim(),
       adviser_ids: adviserIds,

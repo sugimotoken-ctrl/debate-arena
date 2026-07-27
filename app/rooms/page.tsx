@@ -14,7 +14,7 @@ export default async function RoomsPage() {
   const sb = await supabaseServer();
   const { data } = await sb
     .from("rooms")
-    .select("id,name,topic,convened,created_at,updated_at")
+    .select("id,name,topic,convened,owner_id,updated_at")
     .order("updated_at", { ascending: false });
 
   return (
@@ -27,7 +27,10 @@ export default async function RoomsPage() {
         <p className="mb-6" style={{ color: "#5C5C6E", fontSize: 15 }}>
           Name a meeting, convene the council, and reopen it anytime to continue.
         </p>
-        <RoomsList initial={(data as any[]) ?? []} />
+        <RoomsList
+          initial={(data as any[]) ?? []}
+          me={{ id: profile.id, role: profile.role }}
+        />
       </div>
     </>
   );
