@@ -144,7 +144,7 @@ export default function CouncilApp({
           style={{ maxWidth: 620, fontSize: 18, lineHeight: 1.55, color: "#5C5C6E" }}
         >
           Bring a decision to your advisory board — powered by{" "}
-          <b style={{ color: "#12B981" }}>ChatGPT (GPT-5.5 Pro)</b>. Speak or type
+          <b style={{ color: "#12B981" }}>ChatGPT (GPT-5.5)</b>. Speak or type
           your topic, hear each adviser, then the Chair synthesizes a
           recommendation.
         </p>
