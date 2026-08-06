@@ -113,3 +113,20 @@ create policy "approved insert user messages" on public.messages
 
 -- ============ REALTIME ============
 alter publication supabase_realtime add table public.messages;
+
+-- =============================================================================
+-- Opportunity Radar tab — stores discovered opportunities + your triage.
+-- =============================================================================
+create table if not exists radar_opportunities (
+  id            uuid primary key default gen_random_uuid(),
+  source_module text not null,
+  title         text not null,
+  score_total   int  not null default 0,
+  status        text not null default 'new',
+  notes         text not null default '',
+  search_query  text,
+  data          jsonb not null default '{}'::jsonb,
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now()
+);
+create index if not exists idx_radar_opps_score on radar_opportunities (score_total desc);
