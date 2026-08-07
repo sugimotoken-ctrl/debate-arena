@@ -3,9 +3,8 @@
 import { useState } from "react";
 import DebateApp from "./DebateApp";
 import CouncilApp from "./CouncilApp";
-import RadarApp from "./radar/RadarApp";
 
-type Tab = "council" | "debate" | "radar";
+type Tab = "council" | "debate";
 
 export default function AppShell() {
   const [tab, setTab] = useState<Tab>("council");
@@ -38,9 +37,6 @@ export default function AppShell() {
         <Pill active={tab === "council"} kind="council" onClick={() => setTab("council")}>
           🏛️ Council
         </Pill>
-        <Pill active={tab === "radar"} kind="radar" onClick={() => setTab("radar")}>
-          📡 Radar
-        </Pill>
         <a
           href="/rooms"
           className="absolute right-6 rounded-full font-bold text-sm transition"
@@ -56,9 +52,11 @@ export default function AppShell() {
         </a>
       </nav>
 
-      {tab === "council" && <CouncilApp onSwitchToDebate={() => setTab("debate")} />}
-      {tab === "debate" && <DebateApp onSwitchToCouncil={() => setTab("council")} />}
-      {tab === "radar" && <RadarApp />}
+      {tab === "council" ? (
+        <CouncilApp onSwitchToDebate={() => setTab("debate")} />
+      ) : (
+        <DebateApp onSwitchToCouncil={() => setTab("council")} />
+      )}
     </div>
   );
 }
@@ -70,7 +68,7 @@ function Pill({
   children,
 }: {
   active: boolean;
-  kind: "debate" | "council" | "radar";
+  kind: "debate" | "council";
   onClick: () => void;
   children: React.ReactNode;
 }) {
@@ -79,12 +77,6 @@ function Pill({
       ? {
           background: "linear-gradient(90deg,#FF6B4A,#FF9F1C)",
           boxShadow: "0 8px 20px rgba(255,107,74,.3)",
-          color: "#fff",
-        }
-      : kind === "radar"
-      ? {
-          background: "linear-gradient(90deg,#7C6CFF,#534AB7)",
-          boxShadow: "0 8px 20px rgba(83,74,183,.3)",
           color: "#fff",
         }
       : {

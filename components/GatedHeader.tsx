@@ -37,6 +37,12 @@ export default function GatedHeader({ profile }: { profile: Profile }) {
         >
           ⚖️ Debate
         </Link>
+        <Link
+          href="/radar"
+          style={{ fontSize: 14, fontWeight: 600, color: "#6B6B7B" }}
+        >
+          📡 Radar
+        </Link>
         <div className="ml-auto flex items-center gap-3">
           <span style={{ fontSize: 13, color: "#8A8A9A" }}>
             {profile.full_name || profile.email}
